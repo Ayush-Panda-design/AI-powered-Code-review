@@ -2,6 +2,7 @@ import { Webhooks } from "@octokit/webhooks";
 import { NextResponse } from "next/server";
 
 import { savePullRequest } from "@/features/reviews/server/save-pull-request";
+import { triggerReviewJob } from "@/features/reviews/server/trigger-review";
 import {
   REVIEWABLE_PR_ACTIONS,
   type PullRequestWebhookPayload,
@@ -42,6 +43,10 @@ export async function handleGitHubWebhook(request: Request) {
     return NextResponse.json({ ok: true, ignored: true });
   }
 
+  if (process.env.NODE_ENV === "development") {
+    console.info("[github/webhook] pull_request event received");
+  }
+
   let data: PullRequestWebhookPayload;
   try {
     data = JSON.parse(payload) as PullRequestWebhookPayload;
@@ -62,6 +67,23 @@ export async function handleGitHubWebhook(request: Request) {
 
     return NextResponse.json(
       { error: "Failed to save pull request" },
+      { status: 500 }
+    );
+  }
+
+  try {
+    await triggerReviewJob(data);
+
+    if (process.env.NODE_ENV === "development") {
+      console.info("[github/webhook] queued github/pr.received");
+    }
+  } catch (error) {
+    if (process.env.NODE_ENV === "development") {
+      console.error("[github/webhook] failed to queue review job:", error);
+    }
+
+    return NextResponse.json(
+      { error: "Failed to queue review job" },
       { status: 500 }
     );
   }

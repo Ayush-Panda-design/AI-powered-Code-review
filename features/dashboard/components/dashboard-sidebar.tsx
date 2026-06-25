@@ -17,7 +17,6 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { dashboardRoutes } from "@/features/dashboard/lib/routes";
-import { cn } from "@/lib/utils";
 
 export function DashboardSidebar() {
   const pathname = usePathname();
@@ -76,15 +75,7 @@ export function DashboardSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border">
-        <p
-          className={cn(
-            "px-2 text-xs text-muted-foreground group-data-[collapsible=icon]:hidden"
-          )}
-        >
-          Mock data preview
-        </p>
-      </SidebarFooter>
+      <SidebarFooter className="border-t border-sidebar-border" />
       <SidebarRail />
     </Sidebar>
   );

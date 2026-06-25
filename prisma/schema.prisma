@@ -87,7 +87,7 @@ model GitHubInstallation {
 }
 
 model PullRequest {
-  id             String   @id @default(cuid())
+  id             String    @id @default(cuid())
   installationId Int
   repoFullName   String
   prNumber       Int
@@ -95,9 +95,11 @@ model PullRequest {
   authorLogin    String
   headSha        String
   baseBranch     String
-  status         String   @default("pending")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status         String    @default("pending")
+  reviewComment  String?
+  reviewedAt     DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   @@unique([repoFullName, prNumber])
   @@map("pull_request")

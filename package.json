@@ -4,16 +4,20 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "inngest:dev": "npx inngest-cli@latest dev -u http://localhost:3000/api/inngest --no-discovery",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@openrouter/ai-sdk-provider": "^2.9.1",
+    "@pinecone-database/pinecone": "^8.0.0",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@tanstack/react-query": "^5.101.1",
     "@teispace/next-themes": "^2.0.2",
+    "ai": "^6.0.209",
     "better-auth": "^1.6.20",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -21,6 +25,7 @@
     "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
     "embla-carousel-react": "^8.6.0",
+    "inngest": "^4.11.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^1.21.0",
     "next": "16.2.9",
