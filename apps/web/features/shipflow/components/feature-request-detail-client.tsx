@@ -14,7 +14,8 @@ import {
 } from "@/features/shipflow/components/release-approval-panel";
 import { WorkflowStatusCard } from "@/features/shipflow/components/workflow-status-card";
 import {
-  getCreditHint,
+  aiJobToastId,
+  getCreditAffordance,
   getLowCreditsBannerMessage,
 } from "@/features/shipflow/lib/credit-hints";
 import { AI_CREDIT_COSTS, isInFlightFeatureStatus } from "@repo/services/constants";
@@ -54,23 +55,21 @@ export function FeatureRequestDetailClient({
     router.refresh();
   };
 
-  const aiJobToastId = (action: string) => `ai-job-${featureId}-${action}`;
-
   const aiMutationHandlers = (action: string, cost: number) => ({
     onMutate: () => {
       toast.loading(`${action}… (${cost} credit${cost === 1 ? "" : "s"})`, {
-        id: aiJobToastId(action),
+        id: aiJobToastId(featureId, action),
       });
     },
     onSuccess: async () => {
       toast.success(
         `${action} started — ${cost} credit${cost === 1 ? "" : "s"} will be used`,
-        { id: aiJobToastId(action) },
+        { id: aiJobToastId(featureId, action) },
       );
       await invalidate();
     },
     onError: (err: { message: string }) => {
-      toast.error(err.message, { id: aiJobToastId(action) });
+      toast.error(err.message, { id: aiJobToastId(featureId, action) });
     },
   });
 
@@ -88,10 +87,9 @@ export function FeatureRequestDetailClient({
   const inFlight = feature ? isInFlightFeatureStatus(feature.status) : false;
   const billingHref = "/dashboard/billing";
 
-  const creditHint = (cost: number) =>
-    getCreditHint({ cost, credits, inFlight, billingHref });
+  const creditAffordance = (cost: number) =>
+    getCreditAffordance({ cost, credits, inFlight, billingHref });
 
-  const canAfford = (cost: number) => !inFlight && credits >= cost;
   const lowCreditsBanner = getLowCreditsBannerMessage(
     credits,
     (feature?.pullRequests.length ?? 0) > 0,
@@ -137,10 +135,11 @@ export function FeatureRequestDetailClient({
             variant="outline"
             size="sm"
             disabled={inFlight || clarifyMutation.isPending}
-            title={creditHint(AI_CREDIT_COSTS.clarify)}
+            title={creditAffordance(AI_CREDIT_COSTS.clarify).hint}
             onClick={() => {
-              if (!canAfford(AI_CREDIT_COSTS.clarify)) {
-                toast.error(creditHint(AI_CREDIT_COSTS.clarify));
+              const { canAfford, hint } = creditAffordance(AI_CREDIT_COSTS.clarify);
+              if (!canAfford) {
+                toast.error(hint);
                 return;
               }
               clarifyMutation.mutate({ featureRequestId: featureId });
@@ -154,10 +153,11 @@ export function FeatureRequestDetailClient({
             variant="outline"
             size="sm"
             disabled={inFlight || prdMutation.isPending}
-            title={creditHint(AI_CREDIT_COSTS.prd)}
+            title={creditAffordance(AI_CREDIT_COSTS.prd).hint}
             onClick={() => {
-              if (!canAfford(AI_CREDIT_COSTS.prd)) {
-                toast.error(creditHint(AI_CREDIT_COSTS.prd));
+              const { canAfford, hint } = creditAffordance(AI_CREDIT_COSTS.prd);
+              if (!canAfford) {
+                toast.error(hint);
                 return;
               }
               prdMutation.mutate({ featureRequestId: featureId });
@@ -171,10 +171,11 @@ export function FeatureRequestDetailClient({
             variant="outline"
             size="sm"
             disabled={inFlight || tasksMutation.isPending}
-            title={creditHint(AI_CREDIT_COSTS.tasks)}
+            title={creditAffordance(AI_CREDIT_COSTS.tasks).hint}
             onClick={() => {
-              if (!canAfford(AI_CREDIT_COSTS.tasks)) {
-                toast.error(creditHint(AI_CREDIT_COSTS.tasks));
+              const { canAfford, hint } = creditAffordance(AI_CREDIT_COSTS.tasks);
+              if (!canAfford) {
+                toast.error(hint);
                 return;
               }
               tasksMutation.mutate({ featureRequestId: featureId });

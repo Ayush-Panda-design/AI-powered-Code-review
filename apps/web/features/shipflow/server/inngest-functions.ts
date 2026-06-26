@@ -6,16 +6,12 @@ import {
   updateFeatureStatus,
   upsertPrd,
 } from "@repo/services";
+import { chargeFeatureCreditsForJob } from "@/features/shipflow/server/feature-credits";
 import {
-  chargeFeatureCreditsForJob,
-  type FeatureJobCreditError,
-} from "@/features/shipflow/server/feature-credits";
-import { shipflowJobFailure } from "@/features/shipflow/server/job-results";
+  shipflowCreditJobFailure,
+  shipflowFeatureNotFound,
+} from "@/features/shipflow/server/job-results";
 import { generateClarificationQuestions, generatePrdFromRequest } from "./ai";
-
-function returnCreditError(creditError: FeatureJobCreditError) {
-  return shipflowJobFailure(creditError.error, creditError.message);
-}
 
 export const clarifyFeatureRequest = inngest.createFunction(
   {
@@ -25,15 +21,13 @@ export const clarifyFeatureRequest = inngest.createFunction(
   async ({ event }) => {
     const { featureRequestId } = event.data as { featureRequestId: string };
     const feature = await getFeatureRequest(featureRequestId);
-    if (!feature) {
-      return shipflowJobFailure("feature_not_found", "Feature request not found.");
-    }
+    if (!feature) return shipflowFeatureNotFound();
 
     const creditError = await chargeFeatureCreditsForJob(
       feature.project.workspaceId,
       AI_CREDIT_COSTS.clarify,
     );
-    if (creditError) return returnCreditError(creditError);
+    if (creditError) return shipflowCreditJobFailure(creditError);
 
     await updateFeatureStatus(featureRequestId, "clarifying");
 
@@ -56,15 +50,13 @@ export const generatePrd = inngest.createFunction(
   async ({ event }) => {
     const { featureRequestId } = event.data as { featureRequestId: string };
     const feature = await getFeatureRequest(featureRequestId);
-    if (!feature) {
-      return shipflowJobFailure("feature_not_found", "Feature request not found.");
-    }
+    if (!feature) return shipflowFeatureNotFound();
 
     const creditError = await chargeFeatureCreditsForJob(
       feature.project.workspaceId,
       AI_CREDIT_COSTS.prd,
     );
-    if (creditError) return returnCreditError(creditError);
+    if (creditError) return shipflowCreditJobFailure(creditError);
 
     await updateFeatureStatus(featureRequestId, "prd_generating");
 

@@ -5,11 +5,12 @@ import {
   getFeatureRequest,
   updateFeatureStatus,
 } from "@repo/services";
+import { chargeFeatureCreditsForJob } from "@/features/shipflow/server/feature-credits";
 import {
-  chargeFeatureCreditsForJob,
-  type FeatureJobCreditError,
-} from "@/features/shipflow/server/feature-credits";
-import { shipflowJobFailure } from "@/features/shipflow/server/job-results";
+  shipflowCreditJobFailure,
+  shipflowFeatureNotFound,
+  shipflowPrdNotFound,
+} from "@/features/shipflow/server/job-results";
 import { generateTasksFromPrd } from "./ai";
 
 export const generateTasks = inngest.createFunction(
@@ -20,20 +21,14 @@ export const generateTasks = inngest.createFunction(
   async ({ event }) => {
     const { featureRequestId } = event.data as { featureRequestId: string };
     const feature = await getFeatureRequest(featureRequestId);
-    if (!feature) {
-      return shipflowJobFailure("feature_not_found", "Feature request not found.");
-    }
-    if (!feature.prd) {
-      return shipflowJobFailure("prd_not_found", "PRD not found for this feature.");
-    }
+    if (!feature) return shipflowFeatureNotFound();
+    if (!feature.prd) return shipflowPrdNotFound();
 
     const creditError = await chargeFeatureCreditsForJob(
       feature.project.workspaceId,
       AI_CREDIT_COSTS.tasks,
     );
-    if (creditError) {
-      return shipflowJobFailure(creditError.error, creditError.message);
-    }
+    if (creditError) return shipflowCreditJobFailure(creditError);
 
     await updateFeatureStatus(featureRequestId, "planning");
 

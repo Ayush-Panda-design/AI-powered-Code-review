@@ -7,21 +7,36 @@ type CreditHintOptions = {
   billingHref?: string;
 };
 
-export function getCreditHint({
+export function getCreditAffordance({
   cost,
   credits,
   inFlight,
   billingHref = "/dashboard/billing",
 }: CreditHintOptions) {
   if (inFlight) {
-    return "Wait for the current AI job to finish.";
+    return {
+      canAfford: false,
+      hint: "Wait for the current AI job to finish.",
+    };
   }
 
   if (credits < cost) {
-    return `Need ${cost} AI credits (you have ${credits}). Go to Billing (${billingHref}) to upgrade.`;
+    return {
+      canAfford: false,
+      hint: `Need ${cost} AI credits (you have ${credits}). Go to Billing (${billingHref}) to upgrade.`,
+    };
   }
 
-  return `Uses ${cost} AI credit${cost === 1 ? "" : "s"}.`;
+  return {
+    canAfford: true,
+    hint: `Uses ${cost} AI credit${cost === 1 ? "" : "s"}.`,
+  };
+}
+
+export const AI_JOB_TOAST_PREFIX = "ai-job";
+
+export function aiJobToastId(featureId: string, action: string) {
+  return `${AI_JOB_TOAST_PREFIX}-${featureId}-${action}`;
 }
 
 const MIN_AI_ACTION_COST = Math.min(
