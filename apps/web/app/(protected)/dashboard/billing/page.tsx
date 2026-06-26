@@ -1,7 +1,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { UpgradeButton } from "@/features/billing/components/upgrade-button";
-import { isRazorpayConfigured } from "@/lib/razorpay";
+import { isRazorpayConfigured, isRazorpayProductionReady } from "@/lib/razorpay";
 import { ensureWorkspaceAction } from "@/lib/actions/shipflow";
 import { countConnectedRepositories } from "@repo/services";
 
@@ -13,7 +13,7 @@ const plans = [
   },
   {
     name: "Pro",
-    price: "₹999/mo",
+    price: "₹999 / 30 days",
     features: [
       "100 repositories",
       "200 AI credits",
@@ -27,6 +27,8 @@ const plans = [
 export default async function BillingPage() {
   const workspace = await ensureWorkspaceAction();
   const razorpayReady = isRazorpayConfigured();
+  const razorpayProductionReady = isRazorpayProductionReady();
+  const isProduction = process.env.NODE_ENV === "production";
   const isPro = workspace.plan === "pro";
   const connectedRepos = await countConnectedRepositories(workspace.id);
 
@@ -43,9 +45,21 @@ export default async function BillingPage() {
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardContent className="pt-6 text-sm text-muted-foreground">
             Add <code>RAZORPAY_KEY_ID</code> and <code>RAZORPAY_KEY_SECRET</code>{" "}
-            to <code>apps/web/.env</code> to enable live Razorpay checkout (₹999
-            one-time Pro activation). Point webhooks to{" "}
-            <code>/api/razorpay/webhook</code>.
+            to enable Razorpay checkout (₹999 for 30 days of Pro). In production,
+            also set <code>RAZORPAY_WEBHOOK_SECRET</code> and register{" "}
+            <code>https://your-domain.com/api/razorpay/webhook</code> with event{" "}
+            <code>payment.captured</code>.
+          </CardContent>
+        </Card>
+      )}
+
+      {razorpayReady && isProduction && !razorpayProductionReady && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            Checkout keys are set, but <code>RAZORPAY_WEBHOOK_SECRET</code> is
+            missing. Add it in Vercel env vars and configure the webhook URL in
+            the Razorpay dashboard so payments complete if the user closes the
+            browser before verification.
           </CardContent>
         </Card>
       )}

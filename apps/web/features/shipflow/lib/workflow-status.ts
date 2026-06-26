@@ -7,7 +7,7 @@ export function describeWorkflowStatus(status: string) {
     case "planning":
       return "AI is breaking the PRD into engineering tasks.";
     case "fix_needed":
-      return "Blocking issues found. Developer should fix and push — the next PR sync auto-triggers re-review.";
+      return "AI flagged blocking issues. Fix and re-review, or approve manually if findings are false positives.";
     case "in_development":
       return "Fixes in progress. Push commits or run re-review when ready.";
     case "in_review":

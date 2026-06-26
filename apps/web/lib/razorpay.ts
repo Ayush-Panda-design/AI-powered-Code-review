@@ -11,12 +11,32 @@ export function isRazorpayConfigured() {
   return Boolean(readEnv("RAZORPAY_KEY_ID") && readEnv("RAZORPAY_KEY_SECRET"));
 }
 
+export function isRazorpayWebhookConfigured() {
+  return Boolean(readEnv("RAZORPAY_WEBHOOK_SECRET"));
+}
+
+/** Live checkout + webhook backup both ready (required for production). */
+export function isRazorpayProductionReady() {
+  return isRazorpayConfigured() && isRazorpayWebhookConfigured();
+}
+
 export function getRazorpayConfigError(): string | null {
   if (!readEnv("RAZORPAY_KEY_ID")) {
     return "RAZORPAY_KEY_ID is missing.";
   }
   if (!readEnv("RAZORPAY_KEY_SECRET")) {
     return "RAZORPAY_KEY_SECRET is missing.";
+  }
+  return null;
+}
+
+export function getRazorpayProductionConfigError(): string | null {
+  const checkoutError = getRazorpayConfigError();
+  if (checkoutError) {
+    return checkoutError;
+  }
+  if (!readEnv("RAZORPAY_WEBHOOK_SECRET")) {
+    return "RAZORPAY_WEBHOOK_SECRET is missing (required for production webhooks).";
   }
   return null;
 }
@@ -75,7 +95,7 @@ export async function createProCheckoutOrder(workspaceId: string) {
 }
 
 export function verifyRazorpayWebhookSignature(body: string, signature: string) {
-  const secret = readEnv("RAZORPAY_KEY_SECRET");
+  const secret = readEnv("RAZORPAY_WEBHOOK_SECRET");
   if (!secret) {
     return false;
   }

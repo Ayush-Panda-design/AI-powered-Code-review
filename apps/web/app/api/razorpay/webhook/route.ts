@@ -1,7 +1,14 @@
 import { NextResponse } from "next/server";
 
 import { upgradeWorkspaceToPro } from "@/lib/billing/upgrade-workspace";
-import { verifyRazorpayWebhookSignature } from "@/lib/razorpay";
+import {
+  markRazorpayOrderPaid,
+  resolveWorkspaceForRazorpayOrder,
+} from "@/lib/billing/razorpay-order";
+import {
+  isRazorpayWebhookConfigured,
+  verifyRazorpayWebhookSignature,
+} from "@/lib/razorpay";
 
 type RazorpayWebhookPayload = {
   event: string;
@@ -24,6 +31,13 @@ type RazorpayWebhookPayload = {
 };
 
 export async function POST(request: Request) {
+  if (!isRazorpayWebhookConfigured()) {
+    return NextResponse.json(
+      { error: "Razorpay webhook secret is not configured" },
+      { status: 503 },
+    );
+  }
+
   const body = await request.text();
   const signature = request.headers.get("x-razorpay-signature");
 
@@ -43,10 +57,11 @@ export async function POST(request: Request) {
   }
 
   const payment = payload.payload?.payment?.entity;
+  const orderId = payment?.order_id ?? payload.payload?.order?.entity?.id;
   const workspaceId =
+    (orderId ? await resolveWorkspaceForRazorpayOrder(orderId) : null) ??
     payment?.notes?.workspaceId ??
     payload.payload?.order?.entity?.notes?.workspaceId;
-  const orderId = payment?.order_id ?? payload.payload?.order?.entity?.id;
 
   if (!workspaceId || !orderId || payment?.status !== "captured") {
     return NextResponse.json({ error: "Missing workspace context" }, { status: 400 });
@@ -57,6 +72,10 @@ export async function POST(request: Request) {
     orderId,
     payment.id,
   );
+
+  if (result.upgraded) {
+    await markRazorpayOrderPaid(orderId);
+  }
 
   return NextResponse.json({
     ok: true,

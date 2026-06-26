@@ -78,8 +78,10 @@ export async function approveReleaseAction(
     select: { status: true },
   });
 
-  if (!feature || feature.status !== "awaiting_approval") {
-    throw new Error("Feature is not awaiting approval");
+  const approvableStatuses = new Set(["awaiting_approval", "fix_needed"]);
+
+  if (!feature || !approvableStatuses.has(feature.status)) {
+    throw new Error("Feature cannot be approved in its current state");
   }
 
   await prisma.$transaction([

@@ -62,7 +62,7 @@ export function UpgradeButton({
         currency: data.currency,
         order_id: data.orderId,
         name: "ShipFlow AI",
-        description: "Pro plan — monthly",
+        description: "Pro plan — 30 days",
         prefill: data.prefill,
         theme: { color: "#7c3aed" },
         handler: async (response: {
