@@ -53,6 +53,9 @@ export function FeatureRequestDetailClient({
     },
   );
 
+  const credits = workspace?.aiCredits ?? 0;
+  const billingHref = BILLING_PATH;
+
   const invalidate = async () => {
     await utils.featureRequest.get.invalidate({ id: featureId });
     if (workspaceId) {
@@ -88,9 +91,6 @@ export function FeatureRequestDetailClient({
   const tasksMutation = trpc.shipflow.triggerTasks.useMutation(
     aiMutationHandlers("Generate tasks", AI_CREDIT_COSTS.tasks),
   );
-
-  const credits = workspace?.aiCredits ?? 0;
-  const billingHref = BILLING_PATH;
 
   const creditAffordance = (cost: number) =>
     getCreditAffordance({ cost, credits, inFlight, billingHref });
