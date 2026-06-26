@@ -1,11 +1,10 @@
 "use client";
 
 import { Play } from "lucide-react";
-import { useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { runPullRequestReview } from "@/lib/actions/reviews";
+import { trpc } from "@/trpc/client";
 
 type RunReviewButtonProps = {
   pullRequestId: string;
@@ -18,27 +17,27 @@ export function RunReviewButton({
   disabled = false,
   label = "Run review",
 }: RunReviewButtonProps) {
-  const [isPending, startTransition] = useTransition();
+  const utils = trpc.useUtils();
+  const runReview = trpc.review.runReview.useMutation({
+    onSuccess: async (result) => {
+      toast.success(result.message);
+      await utils.featureRequest.get.invalidate();
+    },
+    onError: (error) => {
+      toast.error(error.message);
+    },
+  });
 
   return (
     <Button
       type="button"
       variant="outline"
       size="sm"
-      disabled={disabled || isPending}
-      onClick={() => {
-        startTransition(async () => {
-          const result = await runPullRequestReview(pullRequestId);
-          if (result.ok) {
-            toast.success(result.message);
-          } else {
-            toast.error(result.message);
-          }
-        });
-      }}
+      disabled={disabled || runReview.isPending}
+      onClick={() => runReview.mutate({ pullRequestId })}
     >
       <Play />
-      {isPending ? "Queuing…" : label}
+      {runReview.isPending ? "Queuing…" : label}
     </Button>
   );
 }

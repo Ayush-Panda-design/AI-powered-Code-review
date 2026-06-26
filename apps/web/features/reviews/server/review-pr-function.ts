@@ -1,5 +1,11 @@
 import { inngest, type GitHubPrReceivedEvent } from "@/features/inngest/client";
 import {
+  AI_CREDIT_COSTS,
+  consumeCredits,
+  resolveWorkspaceIdForFeature,
+  resolveWorkspaceIdForInstallation,
+} from "@repo/services";
+import {
   enrichReview,
   generateReview,
 } from "@/features/reviews/server/generate-review";
@@ -74,6 +80,19 @@ export const reviewPullRequest = inngest.createFunction(
     if (!pullRequest) {
       throw new Error(`Pull request ${repoFullName}#${prNumber} not found`);
     }
+
+    await step.run("consume-review-credit", async () => {
+      const workspaceId =
+        (pullRequest.featureRequestId
+          ? await resolveWorkspaceIdForFeature(pullRequest.featureRequestId)
+          : null) ?? (await resolveWorkspaceIdForInstallation(installationId));
+
+      if (!workspaceId) {
+        throw new Error("Workspace not found for review billing");
+      }
+
+      await consumeCredits(workspaceId, AI_CREDIT_COSTS.review);
+    });
 
     await step.run("mark-processing", async () => {
       await prisma.pullRequest.update({

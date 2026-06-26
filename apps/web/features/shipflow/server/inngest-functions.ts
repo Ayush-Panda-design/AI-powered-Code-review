@@ -1,7 +1,10 @@
 import { inngest } from "@/features/inngest/client";
 import {
   addClarification,
+  AI_CREDIT_COSTS,
+  consumeCredits,
   getFeatureRequest,
+  resolveWorkspaceIdForFeature,
   updateFeatureStatus,
   upsertPrd,
 } from "@repo/services";
@@ -16,6 +19,15 @@ export const clarifyFeatureRequest = inngest.createFunction(
     const { featureRequestId } = event.data as { featureRequestId: string };
     const feature = await getFeatureRequest(featureRequestId);
     if (!feature) return { ok: false };
+
+    const workspaceId = await resolveWorkspaceIdForFeature(featureRequestId);
+    if (!workspaceId) return { ok: false, error: "workspace_not_found" };
+
+    try {
+      await consumeCredits(workspaceId, AI_CREDIT_COSTS.clarify);
+    } catch {
+      return { ok: false, error: "insufficient_credits" };
+    }
 
     await updateFeatureStatus(featureRequestId, "clarifying");
 
@@ -39,6 +51,15 @@ export const generatePrd = inngest.createFunction(
     const { featureRequestId } = event.data as { featureRequestId: string };
     const feature = await getFeatureRequest(featureRequestId);
     if (!feature) return { ok: false };
+
+    const workspaceId = await resolveWorkspaceIdForFeature(featureRequestId);
+    if (!workspaceId) return { ok: false, error: "workspace_not_found" };
+
+    try {
+      await consumeCredits(workspaceId, AI_CREDIT_COSTS.prd);
+    } catch {
+      return { ok: false, error: "insufficient_credits" };
+    }
 
     await updateFeatureStatus(featureRequestId, "prd_generating");
 

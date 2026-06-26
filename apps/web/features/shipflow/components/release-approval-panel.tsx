@@ -1,3 +1,8 @@
+"use client";
+
+import { useTransition } from "react";
+import { toast } from "sonner";
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -18,10 +23,27 @@ type ApprovalRecord = {
 export function ReleaseApprovalPanel({
   featureRequestId,
   status,
+  onUpdated,
 }: {
   featureRequestId: string;
   status: string;
+  onUpdated?: () => void | Promise<void>;
 }) {
+  const [isPending, startTransition] = useTransition();
+
+  const runAction = (action: () => Promise<void>) => {
+    startTransition(async () => {
+      try {
+        await action();
+        await onUpdated?.();
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Action failed",
+        );
+      }
+    });
+  };
+
   if (status === "fix_needed") {
     return (
       <Card>
@@ -34,16 +56,17 @@ export function ReleaseApprovalPanel({
             GitHub will auto-queue a re-review. You can also trigger one
             manually:
           </p>
-          <form
-            action={async () => {
-              "use server";
-              await requestReReviewAction(featureRequestId);
-            }}
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={isPending}
+            onClick={() =>
+              runAction(() => requestReReviewAction(featureRequestId))
+            }
           >
-            <Button type="submit" variant="outline" size="sm">
-              Request re-review now
-            </Button>
-          </form>
+            {isPending ? "Requesting…" : "Request re-review now"}
+          </Button>
         </CardContent>
       </Card>
     );
@@ -60,14 +83,17 @@ export function ReleaseApprovalPanel({
       </CardHeader>
       <CardContent className="grid gap-6 md:grid-cols-2">
         <form
-          action={async (formData) => {
-            "use server";
-            await approveReleaseAction(
-              featureRequestId,
-              formData.get("approveNotes")?.toString()
+          className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const formData = new FormData(event.currentTarget);
+            runAction(() =>
+              approveReleaseAction(
+                featureRequestId,
+                formData.get("approveNotes")?.toString(),
+              ),
             );
           }}
-          className="space-y-3"
         >
           <p className="text-sm text-muted-foreground">
             Approve when the feature meets the PRD and passes AI review.
@@ -77,20 +103,23 @@ export function ReleaseApprovalPanel({
             placeholder="Optional approval notes"
             rows={3}
           />
-          <Button type="submit" size="sm">
-            Approve & ship
+          <Button type="submit" size="sm" disabled={isPending}>
+            {isPending ? "Approving…" : "Approve & ship"}
           </Button>
         </form>
 
         <form
-          action={async (formData) => {
-            "use server";
-            await rejectReleaseAction(
-              featureRequestId,
-              formData.get("rejectNotes")?.toString()
-            );
-          }}
           className="space-y-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const formData = new FormData(event.currentTarget);
+            const notes = formData.get("rejectNotes")?.toString();
+            if (!notes?.trim()) {
+              toast.error("Please describe what must be fixed.");
+              return;
+            }
+            runAction(() => rejectReleaseAction(featureRequestId, notes));
+          }}
         >
           <p className="text-sm text-muted-foreground">
             Reject to send the feature back for fixes (status → fix needed).
@@ -101,8 +130,13 @@ export function ReleaseApprovalPanel({
             rows={3}
             required
           />
-          <Button type="submit" variant="destructive" size="sm">
-            Reject release
+          <Button
+            type="submit"
+            variant="destructive"
+            size="sm"
+            disabled={isPending}
+          >
+            {isPending ? "Rejecting…" : "Reject release"}
           </Button>
         </form>
       </CardContent>

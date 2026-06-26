@@ -12,6 +12,12 @@ import { syncPullRequestsForInstallation } from "@/features/reviews/server/sync-
 import { queueReviewForPullRequest } from "@/features/reviews/server/trigger-review";
 import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
+import {
+  AI_CREDIT_COSTS,
+  assertHasCredits,
+  InsufficientCreditsError,
+  resolveWorkspaceIdForInstallation,
+} from "@repo/services";
 
 const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
@@ -67,6 +73,22 @@ export async function runPullRequestReview(
           "Review already in progress. Wait a minute, then refresh the page.",
       };
     }
+  }
+
+  const workspaceId = await resolveWorkspaceIdForInstallation(
+    installation.installationId,
+  );
+  if (!workspaceId) {
+    return { ok: false, message: "Workspace not found." };
+  }
+
+  try {
+    await assertHasCredits(workspaceId, AI_CREDIT_COSTS.review);
+  } catch (error) {
+    if (error instanceof InsufficientCreditsError) {
+      return { ok: false, message: error.message };
+    }
+    throw error;
   }
 
   await prisma.pullRequest.update({

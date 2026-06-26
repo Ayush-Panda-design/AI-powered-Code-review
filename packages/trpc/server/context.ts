@@ -8,10 +8,18 @@ export type TrpcContext = {
 function parseSessionToken(cookieHeader: string | undefined) {
   if (!cookieHeader) return null;
 
+  const cookieNames = [
+    "better-auth.session_token=",
+    "__Secure-better-auth.session_token=",
+  ];
+
   const cookies = cookieHeader.split(";").map((part) => part.trim());
   for (const cookie of cookies) {
-    if (cookie.startsWith("better-auth.session_token=")) {
-      return decodeURIComponent(cookie.slice("better-auth.session_token=".length));
+    for (const prefix of cookieNames) {
+      if (cookie.startsWith(prefix)) {
+        const raw = decodeURIComponent(cookie.slice(prefix.length));
+        return raw.split(".")[0] ?? raw;
+      }
     }
   }
 

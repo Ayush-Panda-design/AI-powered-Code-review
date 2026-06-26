@@ -2,12 +2,20 @@
 
 import { revalidatePath } from "next/cache";
 
-import { inngest } from "@/features/inngest/client";
 import { queueReviewForPullRequest } from "@/features/reviews/server/trigger-review";
 import { requestManualReReview } from "@/features/shipflow/server/feature-workflow";
 import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
-import { ensureDefaultWorkspace } from "@repo/services";
+import {
+  AI_CREDIT_COSTS,
+  assertHasCredits,
+  ensureDefaultWorkspace,
+  InsufficientCreditsError,
+  resolveWorkspaceIdForFeature,
+  sendClarifyJob,
+  sendPrdJob,
+  sendTasksJob,
+} from "@repo/services";
 
 export async function ensureWorkspaceAction() {
   const session = await requireSession();
@@ -18,33 +26,42 @@ export async function ensureWorkspaceAction() {
   return workspace;
 }
 
+async function assertFeatureCredits(
+  featureRequestId: string,
+  cost: number,
+) {
+  const workspaceId = await resolveWorkspaceIdForFeature(featureRequestId);
+  if (!workspaceId) {
+    throw new Error("Workspace not found for this feature");
+  }
+
+  await assertHasCredits(workspaceId, cost);
+  return workspaceId;
+}
+
 export async function triggerClarificationAction(featureRequestId: string) {
   await requireSession();
-  await inngest.send({
-    name: "shipflow/feature.clarify",
-    data: { featureRequestId },
-  });
+  await assertFeatureCredits(featureRequestId, AI_CREDIT_COSTS.clarify);
+  await sendClarifyJob(featureRequestId);
   revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
 }
 
 export async function triggerPrdGenerationAction(featureRequestId: string) {
   await requireSession();
-  await inngest.send({
-    name: "shipflow/prd.generate",
-    data: { featureRequestId },
-  });
+  await assertFeatureCredits(featureRequestId, AI_CREDIT_COSTS.prd);
+  await sendPrdJob(featureRequestId);
   revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
 }
 
 export async function triggerTaskGenerationAction(featureRequestId: string) {
   await requireSession();
-  await inngest.send({
-    name: "shipflow/tasks.generate",
-    data: { featureRequestId },
-  });
+  await assertFeatureCredits(featureRequestId, AI_CREDIT_COSTS.tasks);
+  await sendTasksJob(featureRequestId);
   revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
   revalidatePath("/dashboard/tasks");
 }
+
+export { InsufficientCreditsError };
 
 export async function approveReleaseAction(
   featureRequestId: string,
@@ -114,6 +131,7 @@ export async function rejectReleaseAction(
 
 export async function requestReReviewAction(featureRequestId: string) {
   await requireSession();
+  await assertFeatureCredits(featureRequestId, AI_CREDIT_COSTS.review);
 
   const pullRequest = await requestManualReReview(featureRequestId);
 
@@ -123,7 +141,7 @@ export async function requestReReviewAction(featureRequestId: string) {
     prNumber: pullRequest.prNumber,
     title: pullRequest.title,
     authorLogin: pullRequest.authorLogin,
-    headSha: pullRequest.head.sha,
+    headSha: pullRequest.headSha,
     baseBranch: pullRequest.baseBranch,
     action: "synchronize",
   });

@@ -19,6 +19,26 @@ export const TASK_STATUSES = ["todo", "in_progress", "done"] as const;
 
 export type TaskStatus = (typeof TASK_STATUSES)[number];
 
+export const AI_CREDIT_COSTS = {
+  clarify: 1,
+  prd: 2,
+  tasks: 2,
+  review: 3,
+} as const;
+
+export type AiCreditAction = keyof typeof AI_CREDIT_COSTS;
+
+export const IN_FLIGHT_FEATURE_STATUSES = [
+  "clarifying",
+  "prd_generating",
+  "planning",
+  "in_review",
+] as const;
+
+export function isInFlightFeatureStatus(status: string) {
+  return (IN_FLIGHT_FEATURE_STATUSES as readonly string[]).includes(status);
+}
+
 export function slugify(value: string) {
   return value
     .toLowerCase()

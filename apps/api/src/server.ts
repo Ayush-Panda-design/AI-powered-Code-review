@@ -20,13 +20,19 @@ const openApiDocument = generateOpenApiDocument(serverRouter, {
   baseUrl: env.BASE_URL.concat("/api"),
 });
 
-if (env.NODE_ENV !== "production") {
-  app.use(
-    cors({
-      origin: "*",
-    }),
-  );
-}
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin || env.CORS_ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, origin ?? env.CORS_ALLOWED_ORIGINS[0]);
+        return;
+      }
+
+      callback(new Error(`CORS blocked for origin: ${origin}`));
+    },
+    credentials: true,
+  }),
+);
 
 app.use(express.json());
 

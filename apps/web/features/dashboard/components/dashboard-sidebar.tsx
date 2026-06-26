@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Sparkles } from "lucide-react";
 
 import {
   Sidebar,
@@ -28,16 +29,16 @@ export function DashboardSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton
               size="lg"
-              render={<Link href="/dashboard" />}
+              render={<Link href="/" />}
               className="data-[active=true]:bg-transparent"
             >
               <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <span className="text-sm font-semibold">AI</span>
+                <Sparkles className="size-4" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
-                <span className="truncate font-semibold">Code Reviewer</span>
+                <span className="truncate font-semibold">ShipFlow AI</span>
                 <span className="truncate text-xs text-muted-foreground">
-                  AI-powered reviews
+                  Idea to production
                 </span>
               </div>
             </SidebarMenuButton>

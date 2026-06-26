@@ -5,6 +5,8 @@ import { workspaceRouter } from "./routes/workspace/route";
 import { projectRouter } from "./routes/project/route";
 import { featureRequestRouter } from "./routes/feature-request/route";
 import { taskRouter } from "./routes/task/route";
+import { shipflowRouter } from "./routes/shipflow/route";
+import { reviewRouter } from "./routes/review/route";
 
 export const serverRouter = router({
   health: healthRouter,
@@ -12,6 +14,8 @@ export const serverRouter = router({
   project: projectRouter,
   featureRequest: featureRequestRouter,
   task: taskRouter,
+  shipflow: shipflowRouter,
+  review: reviewRouter,
 });
 
 export { createContext } from "./context";

@@ -4,10 +4,12 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./index.ts"
+    ".": "./index.ts",
+    "./constants": "./constants.ts"
   },
   "dependencies": {
-    "@repo/database": "workspace:*"
+    "@repo/database": "workspace:*",
+    "inngest": "^4.11.0"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",

@@ -126,12 +126,16 @@ function formatTaskContext(context: ReviewContext) {
 }
 
 function normalizeReview(review: StructuredReview): StructuredReview {
-  const findings = review.findings.map((finding, index) => ({
-    ...finding,
-    id: finding.id || `finding-${index + 1}`,
-    severity:
-      finding.severity === "blocking" ? "blocking" : ("non_blocking" as const),
-  }));
+  const findings: StructuredReview["findings"] = review.findings.map(
+    (finding, index) => ({
+      ...finding,
+      id: finding.id || `finding-${index + 1}`,
+      severity:
+        finding.severity === "blocking"
+          ? ("blocking" as const)
+          : ("non_blocking" as const),
+    }),
+  );
 
   return {
     summary: review.summary.trim(),

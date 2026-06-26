@@ -1,10 +1,13 @@
 import Link from "next/link";
-import { ArrowRight, CheckCircle2, GitBranch, Sparkles } from "lucide-react";
+import { ArrowRight, CheckCircle2, GitBranch, LayoutDashboard, Sparkles } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { ModeToggle } from "@/components/ui/mode-toggle";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getServerSession } from "@/lib/auth-session";
 import { DEFAULT_POST_AUTH_PATH } from "@/lib/auth-proxy";
+
+export const dynamic = "force-dynamic";
 
 const workflow = [
   "Feature Request",
@@ -22,10 +25,10 @@ export default async function Home() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 via-white to-zinc-100 dark:from-zinc-950 dark:via-black dark:to-zinc-950">
       <header className="mx-auto flex max-w-6xl items-center justify-between px-6 py-6">
-        <div className="flex items-center gap-2 font-semibold text-lg">
+        <Link href="/" className="flex items-center gap-2 font-semibold text-lg">
           <Sparkles className="size-5 text-violet-500" />
           ShipFlow AI
-        </div>
+        </Link>
         <div className="flex items-center gap-3">
           <ModeToggle />
           {session ? (
@@ -47,6 +50,28 @@ export default async function Home() {
       </header>
 
       <main className="mx-auto max-w-6xl px-6 pb-20 pt-10">
+        {session ? (
+          <section className="mb-10">
+            <Card className="border-violet-500/30 bg-violet-500/5">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <LayoutDashboard className="size-5 text-violet-500" />
+                  Welcome back{session.user.name ? `, ${session.user.name}` : ""}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap items-center justify-between gap-4">
+                <p className="text-sm text-muted-foreground">
+                  Continue shipping features from your dashboard — feature requests,
+                  PR reviews, and release approvals are waiting.
+                </p>
+                <Button render={<Link href={DEFAULT_POST_AUTH_PATH} />}>
+                  Go to dashboard <ArrowRight className="ml-2 size-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          </section>
+        ) : null}
+
         <section className="grid gap-10 lg:grid-cols-2 lg:items-center">
           <div className="space-y-6">
             <p className="text-sm font-medium text-violet-600 dark:text-violet-400">
@@ -60,12 +85,25 @@ export default async function Home() {
               engineering tasks, GitHub PRs, AI QA reviews, fixes, human approval, and release.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Button
-                size="lg"
-                render={<Link href={session ? DEFAULT_POST_AUTH_PATH : "/sign-in"} />}
-              >
-                Start shipping <ArrowRight className="ml-2 size-4" />
-              </Button>
+              {session ? (
+                <Button
+                  size="lg"
+                  render={<Link href={DEFAULT_POST_AUTH_PATH} />}
+                >
+                  Start shipping <ArrowRight className="ml-2 size-4" />
+                </Button>
+              ) : (
+                <Button
+                  size="lg"
+                  render={
+                    <Link
+                      href={`/sign-in?callbackUrl=${encodeURIComponent(DEFAULT_POST_AUTH_PATH)}`}
+                    />
+                  }
+                >
+                  Sign in to start <ArrowRight className="ml-2 size-4" />
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="lg"
@@ -90,14 +128,25 @@ export default async function Home() {
                   <span className="rounded-full bg-violet-500/10 px-3 py-1 text-sm font-medium">
                     {step}
                   </span>
-                  {i < workflow.length - 1 && <ArrowRight className="size-3 text-muted-foreground" />}
+                  {i < workflow.length - 1 && (
+                    <ArrowRight className="size-3 text-muted-foreground" />
+                  )}
                 </div>
               ))}
             </div>
             <ul className="mt-6 space-y-3 text-sm text-muted-foreground">
-              <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 text-emerald-500" /> Multi-tenant workspaces with billing</li>
-              <li className="flex gap-2"><CheckCircle2 className="mt-0.5 size-4 text-emerald-500" /> AI PRD + task generation via Inngest</li>
-              <li className="flex gap-2"><GitBranch className="mt-0.5 size-4 text-blue-500" /> GitHub webhooks + PR-aware AI reviews</li>
+              <li className="flex gap-2">
+                <CheckCircle2 className="mt-0.5 size-4 text-emerald-500" /> Multi-tenant
+                workspaces with billing
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle2 className="mt-0.5 size-4 text-emerald-500" /> AI PRD + task
+                generation via Inngest
+              </li>
+              <li className="flex gap-2">
+                <GitBranch className="mt-0.5 size-4 text-blue-500" /> GitHub webhooks +
+                PR-aware AI reviews
+              </li>
             </ul>
           </div>
         </section>
