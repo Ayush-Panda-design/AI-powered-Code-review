@@ -1,5 +1,5 @@
-import { inngest, type GitHubPrReceivedEvent } from "@/features/inngest/client";
 import type { PullRequestWebhookPayload } from "@/features/reviews/types/review";
+import { sendReviewJob, type GitHubPrReceivedEvent } from "@repo/services";
 
 export type QueueReviewInput = {
   installationId: number;
@@ -24,10 +24,7 @@ export async function queueReviewForPullRequest(input: QueueReviewInput) {
     action: input.action ?? "opened",
   };
 
-  return inngest.send({
-    name: "github/pr.received",
-    data,
-  });
+  return sendReviewJob(data);
 }
 
 export async function triggerReviewJob(payload: PullRequestWebhookPayload) {

@@ -1,12 +1,19 @@
 import { inngest } from "@/features/inngest/client";
 import {
+  AI_CREDIT_COSTS,
   addClarification,
   getFeatureRequest,
   updateFeatureStatus,
   upsertPrd,
 } from "@repo/services";
+import { chargeFeatureCreditsForJob } from "@/features/shipflow/server/feature-credits";
+import {
+  shipflowCreditJobFailure,
+  shipflowFeatureNotFound,
+} from "@/features/shipflow/server/job-results";
 import { generateClarificationQuestions, generatePrdFromRequest } from "./ai";
 
+/** Deducts AI_CREDIT_COSTS.clarify / .prd via chargeFeatureCreditsForJob before AI work. */
 export const clarifyFeatureRequest = inngest.createFunction(
   {
     id: "clarify-feature-request",
@@ -15,7 +22,13 @@ export const clarifyFeatureRequest = inngest.createFunction(
   async ({ event }) => {
     const { featureRequestId } = event.data as { featureRequestId: string };
     const feature = await getFeatureRequest(featureRequestId);
-    if (!feature) return { ok: false };
+    if (!feature) return shipflowFeatureNotFound();
+
+    const creditError = await chargeFeatureCreditsForJob(
+      feature.project.workspaceId,
+      AI_CREDIT_COSTS.clarify,
+    );
+    if (creditError) return shipflowCreditJobFailure(creditError);
 
     await updateFeatureStatus(featureRequestId, "clarifying");
 
@@ -38,7 +51,13 @@ export const generatePrd = inngest.createFunction(
   async ({ event }) => {
     const { featureRequestId } = event.data as { featureRequestId: string };
     const feature = await getFeatureRequest(featureRequestId);
-    if (!feature) return { ok: false };
+    if (!feature) return shipflowFeatureNotFound();
+
+    const creditError = await chargeFeatureCreditsForJob(
+      feature.project.workspaceId,
+      AI_CREDIT_COSTS.prd,
+    );
+    if (creditError) return shipflowCreditJobFailure(creditError);
 
     await updateFeatureStatus(featureRequestId, "prd_generating");
 

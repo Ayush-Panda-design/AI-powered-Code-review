@@ -2,6 +2,7 @@
 
 import { ChevronsUpDown, LogOut, Settings, User } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -28,6 +29,7 @@ function getInitials(name?: string | null, email?: string | null) {
 }
 
 export function UserMenu() {
+  const router = useRouter();
   const { data: session } = useSession();
   const user = session?.user;
 
@@ -36,6 +38,17 @@ export function UserMenu() {
   }
 
   const displayName = user.name || user.email || "User";
+
+  const handleSignOut = async () => {
+    await signOut({
+      fetchOptions: {
+        onSuccess: () => {
+          window.location.href = "/";
+        },
+      },
+    });
+    router.refresh();
+  };
 
   return (
     <DropdownMenu>
@@ -79,11 +92,7 @@ export function UserMenu() {
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
         <DropdownMenuGroup>
-          <DropdownMenuItem
-            onClick={() => {
-              void signOut();
-            }}
-          >
+          <DropdownMenuItem onClick={() => void handleSignOut()}>
             <LogOut />
             Sign out
           </DropdownMenuItem>

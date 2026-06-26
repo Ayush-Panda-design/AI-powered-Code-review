@@ -1,6 +1,14 @@
 import type { FeatureStatus } from "@repo/services";
 import { prisma } from "@/lib/db";
 
+import {
+  describeWorkflowStatus,
+  getWorkflowProgress,
+  type WorkflowProgress,
+} from "@/features/shipflow/lib/workflow-status";
+
+export { describeWorkflowStatus, getWorkflowProgress, type WorkflowProgress };
+
 const TERMINAL_STATUSES = new Set<FeatureStatus>([
   "shipped",
   "rejected",
@@ -85,19 +93,4 @@ export async function requestManualReReview(featureRequestId: string) {
   ]);
 
   return pullRequest;
-}
-
-export function describeWorkflowStatus(status: string) {
-  switch (status) {
-    case "fix_needed":
-      return "Blocking issues found. Developer should fix and push — the next PR sync auto-triggers re-review.";
-    case "in_development":
-      return "Fixes in progress. Push commits or run re-review when ready.";
-    case "in_review":
-      return "AI review running against PRD and acceptance criteria.";
-    case "awaiting_approval":
-      return "No blocking issues. A human can approve or reject release.";
-    default:
-      return null;
-  }
 }
