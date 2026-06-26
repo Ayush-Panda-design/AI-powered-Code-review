@@ -82,15 +82,21 @@ export const reviewPullRequest = inngest.createFunction(
     }
 
     await step.run("consume-review-credit", async () => {
+      const featureResolution = pullRequest.featureRequestId
+        ? await resolveWorkspaceIdForFeature(pullRequest.featureRequestId)
+        : null;
       const workspaceId =
-        (pullRequest.featureRequestId
-          ? await resolveWorkspaceIdForFeature(pullRequest.featureRequestId)
-          : null) ?? (await resolveWorkspaceIdForInstallation(installationId));
+        (featureResolution?.ok ? featureResolution.workspaceId : null) ??
+        (await resolveWorkspaceIdForInstallation(installationId));
 
       const failure = await tryConsumeCredits(
         workspaceId,
         AI_CREDIT_COSTS.review,
       );
+
+      if (failure?.code === "feature_not_found") {
+        throw new Error("Feature request not found for review billing");
+      }
 
       if (failure?.code === "workspace_not_found") {
         throw new Error("Workspace not found for review billing");

@@ -50,18 +50,35 @@ export function FeatureRequestDetailClient({
     router.refresh();
   };
 
-  const clarifyMutation = trpc.shipflow.triggerClarify.useMutation({
-    onSuccess: invalidate,
-    onError: (err) => toast.error(err.message),
+  const aiJobToastId = (action: string) => `ai-job-${featureId}-${action}`;
+
+  const aiMutationHandlers = (action: string, cost: number) => ({
+    onMutate: () => {
+      toast.loading(`${action}… (${cost} credit${cost === 1 ? "" : "s"})`, {
+        id: aiJobToastId(action),
+      });
+    },
+    onSuccess: async () => {
+      toast.success(
+        `${action} started — ${cost} credit${cost === 1 ? "" : "s"} will be used`,
+        { id: aiJobToastId(action) },
+      );
+      await invalidate();
+    },
+    onError: (err: { message: string }) => {
+      toast.error(err.message, { id: aiJobToastId(action) });
+    },
   });
-  const prdMutation = trpc.shipflow.triggerPrd.useMutation({
-    onSuccess: invalidate,
-    onError: (err) => toast.error(err.message),
-  });
-  const tasksMutation = trpc.shipflow.triggerTasks.useMutation({
-    onSuccess: invalidate,
-    onError: (err) => toast.error(err.message),
-  });
+
+  const clarifyMutation = trpc.shipflow.triggerClarify.useMutation(
+    aiMutationHandlers("AI clarify", AI_CREDIT_COSTS.clarify),
+  );
+  const prdMutation = trpc.shipflow.triggerPrd.useMutation(
+    aiMutationHandlers("Generate PRD", AI_CREDIT_COSTS.prd),
+  );
+  const tasksMutation = trpc.shipflow.triggerTasks.useMutation(
+    aiMutationHandlers("Generate tasks", AI_CREDIT_COSTS.tasks),
+  );
 
   const credits = workspace?.aiCredits ?? 0;
   const inFlight = feature ? isInFlightFeatureStatus(feature.status) : false;
@@ -129,7 +146,9 @@ export function FeatureRequestDetailClient({
               clarifyMutation.mutate({ featureRequestId: featureId });
             }}
           >
-            AI clarify ({AI_CREDIT_COSTS.clarify} cr)
+            {clarifyMutation.isPending
+              ? "Starting…"
+              : `AI clarify (${AI_CREDIT_COSTS.clarify} cr)`}
           </Button>
           <Button
             variant="outline"
@@ -144,7 +163,9 @@ export function FeatureRequestDetailClient({
               prdMutation.mutate({ featureRequestId: featureId });
             }}
           >
-            Generate PRD ({AI_CREDIT_COSTS.prd} cr)
+            {prdMutation.isPending
+              ? "Starting…"
+              : `Generate PRD (${AI_CREDIT_COSTS.prd} cr)`}
           </Button>
           <Button
             variant="outline"
@@ -159,7 +180,9 @@ export function FeatureRequestDetailClient({
               tasksMutation.mutate({ featureRequestId: featureId });
             }}
           >
-            Generate tasks ({AI_CREDIT_COSTS.tasks} cr)
+            {tasksMutation.isPending
+              ? "Starting…"
+              : `Generate tasks (${AI_CREDIT_COSTS.tasks} cr)`}
           </Button>
         </div>
       </div>

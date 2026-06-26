@@ -31,21 +31,42 @@ export class InsufficientCreditsError extends Error {
 }
 
 export async function getWorkspaceCredits(workspaceId: string) {
-  const workspace = await prisma.workspace.findUnique({
+  if (!workspaceId?.trim()) {
+    return null;
+  }
+
+  return prisma.workspace.findUnique({
     where: { id: workspaceId },
     select: { aiCredits: true, plan: true },
   });
-
-  return workspace;
 }
 
-export async function resolveWorkspaceIdForFeature(featureRequestId: string) {
+export type FeatureWorkspaceResolution =
+  | { ok: true; workspaceId: string }
+  | { ok: false; reason: "feature_not_found" | "workspace_not_found" };
+
+export async function resolveWorkspaceIdForFeature(
+  featureRequestId: string,
+): Promise<FeatureWorkspaceResolution> {
+  if (!featureRequestId?.trim()) {
+    return { ok: false, reason: "feature_not_found" };
+  }
+
   const feature = await prisma.featureRequest.findUnique({
     where: { id: featureRequestId },
     select: { project: { select: { workspaceId: true } } },
   });
 
-  return feature?.project.workspaceId ?? null;
+  if (!feature) {
+    return { ok: false, reason: "feature_not_found" };
+  }
+
+  const workspaceId = feature.project.workspaceId?.trim();
+  if (!workspaceId) {
+    return { ok: false, reason: "workspace_not_found" };
+  }
+
+  return { ok: true, workspaceId };
 }
 
 export async function resolveWorkspaceIdForInstallation(installationId: number) {
@@ -54,20 +75,25 @@ export async function resolveWorkspaceIdForInstallation(installationId: number) 
     select: { workspaceId: true, userId: true },
   });
 
-  if (install?.workspaceId) {
+  if (!install) {
+    return null;
+  }
+
+  if (install.workspaceId) {
     return install.workspaceId;
   }
 
   // Legacy installs may only have userId; resolve via the user's first workspace membership.
-  if (install?.userId) {
-    const membership = await prisma.workspaceMember.findFirst({
-      where: { userId: install.userId },
-      select: { workspaceId: true },
-    });
-    return membership?.workspaceId ?? null;
+  if (!install.userId) {
+    return null;
   }
 
-  return null;
+  const membership = await prisma.workspaceMember.findFirst({
+    where: { userId: install.userId },
+    select: { workspaceId: true },
+  });
+
+  return membership?.workspaceId ?? null;
 }
 
 export async function assertHasCredits(workspaceId: string, cost: number) {
@@ -100,37 +126,59 @@ export async function consumeCredits(workspaceId: string, cost: number) {
 
   await topUpDevCreditsIfNeeded(workspaceId);
 
-  const workspace = await getWorkspaceCredits(workspaceId);
-  if (!workspace) {
-    throw new Error("Workspace not found");
-  }
-
-  if (workspace.aiCredits < cost) {
-    throw new InsufficientCreditsError(
-      workspaceId,
-      cost,
-      workspace.aiCredits,
-    );
-  }
-
+  // Single atomic decrement — safe under concurrent Inngest jobs (no read-then-write race).
   const result = await prisma.workspace.updateMany({
     where: { id: workspaceId, aiCredits: { gte: cost } },
     data: { aiCredits: { decrement: cost } },
   });
 
   if (result.count === 0) {
-    const latest = await getWorkspaceCredits(workspaceId);
+    const workspace = await getWorkspaceCredits(workspaceId);
+    if (!workspace) {
+      throw new Error("Workspace not found");
+    }
+
     throw new InsufficientCreditsError(
       workspaceId,
       cost,
-      latest?.aiCredits ?? 0,
+      workspace.aiCredits,
     );
   }
 }
 
 export type CreditConsumptionFailure =
+  | { code: "feature_not_found"; message: string }
   | { code: "workspace_not_found"; message: string }
   | { code: "insufficient_credits"; message: string };
+
+function resolutionToCreditFailure(
+  resolution: Extract<FeatureWorkspaceResolution, { ok: false }>,
+): CreditConsumptionFailure {
+  if (resolution.reason === "feature_not_found") {
+    return {
+      code: "feature_not_found",
+      message: "Feature request not found for credit billing.",
+    };
+  }
+
+  return {
+    code: "workspace_not_found",
+    message: "Workspace not found for this feature request.",
+  };
+}
+
+/** Resolves billing workspace from a feature id, then consumes credits atomically. */
+export async function tryConsumeCreditsForFeature(
+  featureRequestId: string,
+  cost: number,
+): Promise<CreditConsumptionFailure | null> {
+  const resolution = await resolveWorkspaceIdForFeature(featureRequestId);
+  if (!resolution.ok) {
+    return resolutionToCreditFailure(resolution);
+  }
+
+  return tryConsumeCredits(resolution.workspaceId, cost);
+}
 
 /** Returns a failure object for expected credit errors; rethrows unexpected errors. */
 export async function tryConsumeCredits(

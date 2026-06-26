@@ -35,13 +35,19 @@ async function assertFeatureAccess(featureRequestId: string, userId: string) {
 }
 
 async function requireCreditsForFeature(featureRequestId: string, cost: number) {
-  const workspaceId = await resolveWorkspaceIdForFeature(featureRequestId);
-  if (!workspaceId) {
-    throw new TRPCError({ code: "NOT_FOUND", message: "Workspace not found" });
+  const resolution = await resolveWorkspaceIdForFeature(featureRequestId);
+  if (!resolution.ok) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message:
+        resolution.reason === "feature_not_found"
+          ? "Feature not found"
+          : "Workspace not found for this feature",
+    });
   }
 
   try {
-    await assertHasCredits(workspaceId, cost);
+    await assertHasCredits(resolution.workspaceId, cost);
   } catch (error) {
     throwTrpcCreditError(error);
   }

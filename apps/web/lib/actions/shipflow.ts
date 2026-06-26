@@ -30,13 +30,17 @@ async function assertFeatureCredits(
   featureRequestId: string,
   cost: number,
 ) {
-  const workspaceId = await resolveWorkspaceIdForFeature(featureRequestId);
-  if (!workspaceId) {
-    throw new Error("Workspace not found for this feature");
+  const resolution = await resolveWorkspaceIdForFeature(featureRequestId);
+  if (!resolution.ok) {
+    throw new Error(
+      resolution.reason === "feature_not_found"
+        ? "Feature not found"
+        : "Workspace not found for this feature",
+    );
   }
 
-  await assertHasCredits(workspaceId, cost);
-  return workspaceId;
+  await assertHasCredits(resolution.workspaceId, cost);
+  return resolution.workspaceId;
 }
 
 export async function triggerClarificationAction(featureRequestId: string) {

@@ -1,14 +1,13 @@
 import { inngest } from "@/features/inngest/client";
 import {
+  AI_CREDIT_COSTS,
   addClarification,
   getFeatureRequest,
   updateFeatureStatus,
   upsertPrd,
 } from "@repo/services";
 import {
-  AI_CREDIT_COSTS,
-  consumeFeatureCreditsForJob,
-  creditFailureToJobResult,
+  chargeFeatureCreditsForJob,
 } from "@/features/shipflow/server/feature-credits";
 import { generateClarificationQuestions, generatePrdFromRequest } from "./ai";
 
@@ -22,13 +21,11 @@ export const clarifyFeatureRequest = inngest.createFunction(
     const feature = await getFeatureRequest(featureRequestId);
     if (!feature) return { ok: false, error: "feature_not_found" };
 
-    const creditFailure = await consumeFeatureCreditsForJob(
-      featureRequestId,
+    const creditError = await chargeFeatureCreditsForJob(
+      feature.project.workspaceId,
       AI_CREDIT_COSTS.clarify,
     );
-    if (creditFailure) {
-      return creditFailureToJobResult(creditFailure);
-    }
+    if (creditError) return creditError;
 
     await updateFeatureStatus(featureRequestId, "clarifying");
 
@@ -53,13 +50,11 @@ export const generatePrd = inngest.createFunction(
     const feature = await getFeatureRequest(featureRequestId);
     if (!feature) return { ok: false, error: "feature_not_found" };
 
-    const creditFailure = await consumeFeatureCreditsForJob(
-      featureRequestId,
+    const creditError = await chargeFeatureCreditsForJob(
+      feature.project.workspaceId,
       AI_CREDIT_COSTS.prd,
     );
-    if (creditFailure) {
-      return creditFailureToJobResult(creditFailure);
-    }
+    if (creditError) return creditError;
 
     await updateFeatureStatus(featureRequestId, "prd_generating");
 
