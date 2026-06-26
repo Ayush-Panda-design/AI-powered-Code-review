@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { createHmac } from "node:crypto";
 
-import { PRO_PLAN_LIMITS } from "@/lib/razorpay";
+import { upgradeWorkspaceToPro } from "@/lib/billing/upgrade-workspace";
+import { markRazorpayOrderPaid } from "@/lib/billing/razorpay-order";
 import { requireSession } from "@/lib/auth-session";
+import { createHmac } from "node:crypto";
 import { prisma } from "@/lib/db";
 
 function readSecret() {
@@ -41,10 +42,18 @@ export async function POST(request: Request) {
 
     const membership = await prisma.workspaceMember.findFirst({
       where: { workspaceId, userId: session.user.id },
+      select: { role: true },
     });
 
     if (!membership) {
       return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
+    }
+
+    if (membership.role !== "owner") {
+      return NextResponse.json(
+        { error: "Only workspace owners can upgrade billing" },
+        { status: 403 },
+      );
     }
 
     const expected = createHmac("sha256", secret)
@@ -55,33 +64,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Invalid payment signature" }, { status: 401 });
     }
 
-    await prisma.$transaction([
-      prisma.workspace.update({
-        where: { id: workspaceId },
-        data: {
-          plan: "pro",
-          aiCredits: PRO_PLAN_LIMITS.aiCredits,
-          repoLimit: PRO_PLAN_LIMITS.repoLimit,
-        },
-      }),
-      prisma.subscription.upsert({
-        where: { workspaceId },
-        create: {
-          workspaceId,
-          plan: "pro",
-          status: "active",
-          razorpaySubscriptionId: orderId,
-        },
-        update: {
-          plan: "pro",
-          status: "active",
-          razorpaySubscriptionId: orderId,
-          currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-        },
-      }),
-    ]);
+    const result = await upgradeWorkspaceToPro(workspaceId, orderId, paymentId);
 
-    return NextResponse.json({ ok: true });
+    if (result.upgraded) {
+      await markRazorpayOrderPaid(orderId);
+    }
+
+    return NextResponse.json({
+      ok: true,
+      upgraded: result.upgraded,
+      alreadyProcessed: !result.upgraded,
+    });
   } catch (error) {
     const message =
       error instanceof Error ? error.message : "Payment verification failed";

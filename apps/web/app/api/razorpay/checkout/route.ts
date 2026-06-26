@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { createProCheckoutOrder, getRazorpayConfigError } from "@/lib/razorpay";
+import { recordRazorpayCheckoutOrder } from "@/lib/billing/razorpay-order";
 import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
 
@@ -29,7 +30,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Workspace not found" }, { status: 404 });
     }
 
+    if (membership.role !== "owner") {
+      return NextResponse.json(
+        { error: "Only workspace owners can upgrade billing" },
+        { status: 403 },
+      );
+    }
+
     const checkout = await createProCheckoutOrder(workspaceId);
+
+    await recordRazorpayCheckoutOrder({
+      razorpayOrderId: checkout.orderId,
+      workspaceId,
+      amountPaise: checkout.amount,
+    });
 
     return NextResponse.json({
       ...checkout,

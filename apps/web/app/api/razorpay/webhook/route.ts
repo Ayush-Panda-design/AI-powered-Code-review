@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { upgradeWorkspaceToPro } from "@/lib/billing/upgrade-workspace";
 import {
-  PRO_PLAN_LIMITS,
+  markRazorpayOrderPaid,
+  resolveWorkspaceForRazorpayOrder,
+} from "@/lib/billing/razorpay-order";
+import {
+  isRazorpayWebhookConfigured,
   verifyRazorpayWebhookSignature,
 } from "@/lib/razorpay";
-import { prisma } from "@/lib/db";
 
 type RazorpayWebhookPayload = {
   event: string;
@@ -27,6 +31,13 @@ type RazorpayWebhookPayload = {
 };
 
 export async function POST(request: Request) {
+  if (!isRazorpayWebhookConfigured()) {
+    return NextResponse.json(
+      { error: "Razorpay webhook secret is not configured" },
+      { status: 503 },
+    );
+  }
+
   const body = await request.text();
   const signature = request.headers.get("x-razorpay-signature");
 
@@ -46,39 +57,29 @@ export async function POST(request: Request) {
   }
 
   const payment = payload.payload?.payment?.entity;
+  const orderId = payment?.order_id ?? payload.payload?.order?.entity?.id;
   const workspaceId =
+    (orderId ? await resolveWorkspaceForRazorpayOrder(orderId) : null) ??
     payment?.notes?.workspaceId ??
     payload.payload?.order?.entity?.notes?.workspaceId;
 
-  if (!workspaceId || payment?.status !== "captured") {
+  if (!workspaceId || !orderId || payment?.status !== "captured") {
     return NextResponse.json({ error: "Missing workspace context" }, { status: 400 });
   }
 
-  await prisma.$transaction([
-    prisma.workspace.update({
-      where: { id: workspaceId },
-      data: {
-        plan: "pro",
-        aiCredits: PRO_PLAN_LIMITS.aiCredits,
-        repoLimit: PRO_PLAN_LIMITS.repoLimit,
-      },
-    }),
-    prisma.subscription.upsert({
-      where: { workspaceId },
-      create: {
-        workspaceId,
-        plan: "pro",
-        status: "active",
-        razorpaySubscriptionId: payment.order_id ?? payment.id ?? null,
-      },
-      update: {
-        plan: "pro",
-        status: "active",
-        razorpaySubscriptionId: payment.order_id ?? payment.id ?? null,
-        currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
-      },
-    }),
-  ]);
+  const result = await upgradeWorkspaceToPro(
+    workspaceId,
+    orderId,
+    payment.id,
+  );
 
-  return NextResponse.json({ ok: true });
+  if (result.upgraded) {
+    await markRazorpayOrderPaid(orderId);
+  }
+
+  return NextResponse.json({
+    ok: true,
+    upgraded: result.upgraded,
+    alreadyProcessed: !result.upgraded,
+  });
 }

@@ -89,6 +89,7 @@ model Workspace {
   projects            Project[]
   subscription        Subscription?
   githubInstallations GitHubInstallation[]
+  razorpayCheckoutOrders RazorpayCheckoutOrder[]
 
   @@map("workspace")
 }
@@ -295,6 +296,7 @@ model Subscription {
   workspaceId            String    @unique
   plan                   String    @default("free")
   razorpaySubscriptionId String?
+  razorpayPaymentId      String?   @unique
   razorpayCustomerId     String?
   status                 String    @default("active")
   currentPeriodEnd       DateTime?
@@ -304,4 +306,19 @@ model Subscription {
   workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@map("subscription")
+}
+
+model RazorpayCheckoutOrder {
+  id              String   @id @default(cuid())
+  razorpayOrderId String   @unique
+  workspaceId     String
+  amountPaise     Int
+  status          String   @default("created")
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId])
+  @@map("razorpay_checkout_order")
 }

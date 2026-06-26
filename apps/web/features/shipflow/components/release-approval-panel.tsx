@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   approveReleaseAction,
@@ -19,6 +20,90 @@ type ApprovalRecord = {
   createdAt: Date;
   reviewer: { name: string; email: string };
 };
+
+function ApproveReleaseForm({
+  featureRequestId,
+  isPending,
+  onSubmit,
+  description,
+  notesPlaceholder,
+}: {
+  featureRequestId: string;
+  isPending: boolean;
+  onSubmit: (action: () => Promise<void>) => void;
+  description: string;
+  notesPlaceholder: string;
+}) {
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        onSubmit(() =>
+          approveReleaseAction(
+            featureRequestId,
+            formData.get("approveNotes")?.toString(),
+          ),
+        );
+      }}
+    >
+      <p className="text-sm text-muted-foreground">{description}</p>
+      <Textarea
+        name="approveNotes"
+        placeholder={notesPlaceholder}
+        rows={3}
+      />
+      <Button type="submit" size="sm" disabled={isPending}>
+        {isPending ? "Approving…" : "Approve & ship"}
+      </Button>
+    </form>
+  );
+}
+
+function RejectReleaseForm({
+  featureRequestId,
+  isPending,
+  onSubmit,
+}: {
+  featureRequestId: string;
+  isPending: boolean;
+  onSubmit: (action: () => Promise<void>) => void;
+}) {
+  return (
+    <form
+      className="space-y-3"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const formData = new FormData(event.currentTarget);
+        const notes = formData.get("rejectNotes")?.toString();
+        if (!notes?.trim()) {
+          toast.error("Please describe what must be fixed.");
+          return;
+        }
+        onSubmit(() => rejectReleaseAction(featureRequestId, notes));
+      }}
+    >
+      <p className="text-sm text-muted-foreground">
+        Reject to send the feature back for fixes (status → fix needed).
+      </p>
+      <Textarea
+        name="rejectNotes"
+        placeholder="What must be fixed before release?"
+        rows={3}
+        required
+      />
+      <Button
+        type="submit"
+        variant="destructive"
+        size="sm"
+        disabled={isPending}
+      >
+        {isPending ? "Rejecting…" : "Reject release"}
+      </Button>
+    </form>
+  );
+}
 
 export function ReleaseApprovalPanel({
   featureRequestId,
@@ -48,25 +133,36 @@ export function ReleaseApprovalPanel({
     return (
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">Fix & re-review</CardTitle>
+          <CardTitle className="text-base">Release decision</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3 text-sm text-muted-foreground">
-          <p>
-            Blocking issues were found. After pushing fixes to the linked PR,
-            GitHub will auto-queue a re-review. You can also trigger one
-            manually:
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={isPending}
-            onClick={() =>
-              runAction(() => requestReReviewAction(featureRequestId))
-            }
-          >
-            {isPending ? "Requesting…" : "Request re-review now"}
-          </Button>
+        <CardContent className="space-y-6">
+          <div className="space-y-3 text-sm text-muted-foreground">
+            <p>
+              AI review flagged blocking issues. Push fixes to the linked PR and
+              GitHub will auto-queue a re-review, or trigger one manually:
+            </p>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isPending}
+              onClick={() =>
+                runAction(() => requestReReviewAction(featureRequestId))
+              }
+            >
+              {isPending ? "Requesting…" : "Request re-review now"}
+            </Button>
+          </div>
+
+          <Separator />
+
+          <ApproveReleaseForm
+            featureRequestId={featureRequestId}
+            isPending={isPending}
+            onSubmit={runAction}
+            description="Review the AI findings above. If they are false positives or acceptable risks, you can override and ship."
+            notesPlaceholder="Optional: why you're overriding AI blocking findings"
+          />
         </CardContent>
       </Card>
     );
@@ -82,63 +178,19 @@ export function ReleaseApprovalPanel({
         <CardTitle className="text-base">Human release gate</CardTitle>
       </CardHeader>
       <CardContent className="grid gap-6 md:grid-cols-2">
-        <form
-          className="space-y-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const formData = new FormData(event.currentTarget);
-            runAction(() =>
-              approveReleaseAction(
-                featureRequestId,
-                formData.get("approveNotes")?.toString(),
-              ),
-            );
-          }}
-        >
-          <p className="text-sm text-muted-foreground">
-            Approve when the feature meets the PRD and passes AI review.
-          </p>
-          <Textarea
-            name="approveNotes"
-            placeholder="Optional approval notes"
-            rows={3}
-          />
-          <Button type="submit" size="sm" disabled={isPending}>
-            {isPending ? "Approving…" : "Approve & ship"}
-          </Button>
-        </form>
+        <ApproveReleaseForm
+          featureRequestId={featureRequestId}
+          isPending={isPending}
+          onSubmit={runAction}
+          description="Approve when the feature meets the PRD and passes AI review."
+          notesPlaceholder="Optional approval notes"
+        />
 
-        <form
-          className="space-y-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const formData = new FormData(event.currentTarget);
-            const notes = formData.get("rejectNotes")?.toString();
-            if (!notes?.trim()) {
-              toast.error("Please describe what must be fixed.");
-              return;
-            }
-            runAction(() => rejectReleaseAction(featureRequestId, notes));
-          }}
-        >
-          <p className="text-sm text-muted-foreground">
-            Reject to send the feature back for fixes (status → fix needed).
-          </p>
-          <Textarea
-            name="rejectNotes"
-            placeholder="What must be fixed before release?"
-            rows={3}
-            required
-          />
-          <Button
-            type="submit"
-            variant="destructive"
-            size="sm"
-            disabled={isPending}
-          >
-            {isPending ? "Rejecting…" : "Reject release"}
-          </Button>
-        </form>
+        <RejectReleaseForm
+          featureRequestId={featureRequestId}
+          isPending={isPending}
+          onSubmit={runAction}
+        />
       </CardContent>
     </Card>
   );
