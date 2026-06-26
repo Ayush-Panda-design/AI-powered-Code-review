@@ -65,18 +65,20 @@ export function FeatureRequestDetailClient({
 
   const credits = workspace?.aiCredits ?? 0;
   const inFlight = feature ? isInFlightFeatureStatus(feature.status) : false;
+  const billingHref = "/dashboard/billing";
 
   const creditHint = (cost: number) => {
     if (inFlight) {
       return "Wait for the current AI job to finish.";
     }
     if (credits < cost) {
-      return `Need ${cost} AI credits (you have ${credits}). Open Billing to upgrade.`;
+      return `Need ${cost} AI credits (you have ${credits}). Go to Billing (${billingHref}) to upgrade.`;
     }
-    return undefined;
+    return `Uses ${cost} AI credit${cost === 1 ? "" : "s"}.`;
   };
 
   const canAfford = (cost: number) => !inFlight && credits >= cost;
+  const showLowCreditsBanner = credits < AI_CREDIT_COSTS.review;
 
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading feature…</p>;
@@ -117,42 +119,69 @@ export function FeatureRequestDetailClient({
           <Button
             variant="outline"
             size="sm"
-            disabled={!canAfford(AI_CREDIT_COSTS.clarify) || clarifyMutation.isPending}
+            disabled={inFlight || clarifyMutation.isPending}
             title={creditHint(AI_CREDIT_COSTS.clarify)}
-            onClick={() => clarifyMutation.mutate({ featureRequestId: featureId })}
+            onClick={() => {
+              if (!canAfford(AI_CREDIT_COSTS.clarify)) {
+                toast.error(creditHint(AI_CREDIT_COSTS.clarify));
+                return;
+              }
+              clarifyMutation.mutate({ featureRequestId: featureId });
+            }}
           >
             AI clarify ({AI_CREDIT_COSTS.clarify} cr)
           </Button>
           <Button
             variant="outline"
             size="sm"
-            disabled={!canAfford(AI_CREDIT_COSTS.prd) || prdMutation.isPending}
+            disabled={inFlight || prdMutation.isPending}
             title={creditHint(AI_CREDIT_COSTS.prd)}
-            onClick={() => prdMutation.mutate({ featureRequestId: featureId })}
+            onClick={() => {
+              if (!canAfford(AI_CREDIT_COSTS.prd)) {
+                toast.error(creditHint(AI_CREDIT_COSTS.prd));
+                return;
+              }
+              prdMutation.mutate({ featureRequestId: featureId });
+            }}
           >
             Generate PRD ({AI_CREDIT_COSTS.prd} cr)
           </Button>
           <Button
             variant="outline"
             size="sm"
-            disabled={!canAfford(AI_CREDIT_COSTS.tasks) || tasksMutation.isPending}
+            disabled={inFlight || tasksMutation.isPending}
             title={creditHint(AI_CREDIT_COSTS.tasks)}
-            onClick={() => tasksMutation.mutate({ featureRequestId: featureId })}
+            onClick={() => {
+              if (!canAfford(AI_CREDIT_COSTS.tasks)) {
+                toast.error(creditHint(AI_CREDIT_COSTS.tasks));
+                return;
+              }
+              tasksMutation.mutate({ featureRequestId: featureId });
+            }}
           >
             Generate tasks ({AI_CREDIT_COSTS.tasks} cr)
           </Button>
         </div>
       </div>
 
-      {credits < AI_CREDIT_COSTS.review ? (
+      {showLowCreditsBanner ? (
         <Card className="border-amber-500/40 bg-amber-500/5">
           <CardContent className="pt-6 text-sm text-muted-foreground">
-            You need at least {AI_CREDIT_COSTS.review} AI credits to run a review
-            (you have {credits}).{" "}
-            <Link href="/dashboard/billing" className="underline">
-              Upgrade on Billing
-            </Link>{" "}
-            to continue running AI jobs.
+            {credits < AI_CREDIT_COSTS.clarify ? (
+              <>
+                You have no AI credits left. AI actions are disabled until you
+                upgrade.{" "}
+              </>
+            ) : (
+              <>
+                You need at least {AI_CREDIT_COSTS.review} AI credits to run a
+                review (you have {credits}).{" "}
+              </>
+            )}
+            <Link href={billingHref} className="font-medium underline">
+              Open Billing to get more credits
+            </Link>
+            .
           </CardContent>
         </Card>
       ) : null}

@@ -26,6 +26,7 @@ export function getAuthTrustedOrigins() {
     origins.add(baseUrl.origin);
   }
 
+  // Production: set BETTER_AUTH_URL and BETTER_AUTH_TRUSTED_ORIGINS (comma-separated).
   const extra = process.env.BETTER_AUTH_TRUSTED_ORIGINS?.split(",") ?? [];
   for (const entry of extra) {
     const trimmed = entry.trim();

@@ -1,11 +1,11 @@
 import type { NextRequest } from "next/server";
 
-import { handleAuthProxy } from "@/lib/auth-proxy";
+import { handleAppProxy } from "@/lib/api-proxy";
 
 export function proxy(request: NextRequest) {
-  return handleAuthProxy(request);
+  return handleAppProxy(request);
 }
 
 export const config = {
-  matcher: ["/dashboard/:path*"],
+  matcher: ["/dashboard/:path*", "/api/trpc/:path*", "/api/auth/:path*"],
 };

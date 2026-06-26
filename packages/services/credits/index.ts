@@ -58,6 +58,7 @@ export async function resolveWorkspaceIdForInstallation(installationId: number) 
     return install.workspaceId;
   }
 
+  // Legacy installs may only have userId; resolve via the user's first workspace membership.
   if (install?.userId) {
     const membership = await prisma.workspaceMember.findFirst({
       where: { userId: install.userId },
@@ -128,7 +129,7 @@ export async function consumeCredits(workspaceId: string, cost: number) {
 }
 
 export type CreditConsumptionFailure =
-  | { code: "workspace_not_found" }
+  | { code: "workspace_not_found"; message: string }
   | { code: "insufficient_credits"; message: string };
 
 /** Returns a failure object for expected credit errors; rethrows unexpected errors. */
@@ -137,7 +138,10 @@ export async function tryConsumeCredits(
   cost: number,
 ): Promise<CreditConsumptionFailure | null> {
   if (!workspaceId?.trim()) {
-    return { code: "workspace_not_found" };
+    return {
+      code: "workspace_not_found",
+      message: "Workspace not found for credit billing.",
+    };
   }
 
   try {

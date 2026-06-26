@@ -8,6 +8,7 @@ import {
 import {
   AI_CREDIT_COSTS,
   consumeFeatureCreditsForJob,
+  creditFailureToJobResult,
 } from "@/features/shipflow/server/feature-credits";
 import { generateClarificationQuestions, generatePrdFromRequest } from "./ai";
 
@@ -26,14 +27,7 @@ export const clarifyFeatureRequest = inngest.createFunction(
       AI_CREDIT_COSTS.clarify,
     );
     if (creditFailure) {
-      return {
-        ok: false,
-        error: creditFailure.code,
-        message:
-          creditFailure.code === "insufficient_credits"
-            ? creditFailure.message
-            : undefined,
-      };
+      return creditFailureToJobResult(creditFailure);
     }
 
     await updateFeatureStatus(featureRequestId, "clarifying");
@@ -64,14 +58,7 @@ export const generatePrd = inngest.createFunction(
       AI_CREDIT_COSTS.prd,
     );
     if (creditFailure) {
-      return {
-        ok: false,
-        error: creditFailure.code,
-        message:
-          creditFailure.code === "insufficient_credits"
-            ? creditFailure.message
-            : undefined,
-      };
+      return creditFailureToJobResult(creditFailure);
     }
 
     await updateFeatureStatus(featureRequestId, "prd_generating");

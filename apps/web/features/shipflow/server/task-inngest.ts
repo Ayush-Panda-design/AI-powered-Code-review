@@ -7,6 +7,7 @@ import {
 import {
   AI_CREDIT_COSTS,
   consumeFeatureCreditsForJob,
+  creditFailureToJobResult,
 } from "@/features/shipflow/server/feature-credits";
 import { generateTasksFromPrd } from "./ai";
 
@@ -25,14 +26,7 @@ export const generateTasks = inngest.createFunction(
       AI_CREDIT_COSTS.tasks,
     );
     if (creditFailure) {
-      return {
-        ok: false,
-        error: creditFailure.code,
-        message:
-          creditFailure.code === "insufficient_credits"
-            ? creditFailure.message
-            : undefined,
-      };
+      return creditFailureToJobResult(creditFailure);
     }
 
     await updateFeatureStatus(featureRequestId, "planning");
