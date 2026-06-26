@@ -1,0 +1,27 @@
+{
+  "name": "shipflow",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "dotenv -e apps/web/.env -- turbo build",
+    "dev": "dotenv -e apps/web/.env -- turbo dev",
+    "lint": "turbo run lint",
+    "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "inngest:dev": "dotenv -e apps/web/.env -- pnpm --filter web inngest:dev",
+    "db:generate": "dotenv -e apps/web/.env -- turbo db:generate",
+    "db:migrate": "dotenv -e apps/web/.env -- turbo db:migrate",
+    "db:deploy": "dotenv -e apps/web/.env -- turbo db:deploy"
+  },
+  "dependencies": {
+    "dotenv-cli": "^11.0.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.7.4",
+    "turbo": "^2.5.4",
+    "typescript": "^5"
+  },
+  "packageManager": "pnpm@9.15.9",
+  "engines": {
+    "node": ">=20"
+  }
+}
