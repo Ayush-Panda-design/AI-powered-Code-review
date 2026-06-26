@@ -1,3 +1,13 @@
+/**
+ * AI credit billing for Inngest jobs.
+ *
+ * Flow (no double-deduction):
+ * - tRPC / server actions: assertHasCredits() — pre-check only before queueing a job
+ * - Inngest (clarify, PRD, tasks): chargeFeatureCreditsForJob() — single atomic deduct
+ * - Inngest (review): tryConsumeCredits() in review-pr-function.ts
+ *
+ * Frontend getCreditAffordance() mirrors costs for UX; backend is authoritative.
+ */
 import {
   tryConsumeCredits,
   type CreditConsumptionFailure,

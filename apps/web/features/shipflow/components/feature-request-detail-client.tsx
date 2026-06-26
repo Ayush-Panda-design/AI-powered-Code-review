@@ -18,6 +18,7 @@ import {
   getCreditAffordance,
   getLowCreditsBannerMessage,
 } from "@/features/shipflow/lib/credit-hints";
+import { BILLING_PATH } from "@/features/dashboard/lib/routes";
 import { AI_CREDIT_COSTS, isInFlightFeatureStatus } from "@repo/services/constants";
 import { trpc } from "@/trpc/client";
 
@@ -42,9 +43,14 @@ export function FeatureRequestDetailClient({
   );
 
   const workspaceId = feature?.project.workspaceId;
+  const inFlight = feature ? isInFlightFeatureStatus(feature.status) : false;
+
   const { data: workspace } = trpc.workspace.get.useQuery(
     { workspaceId: workspaceId ?? "" },
-    { enabled: Boolean(workspaceId) },
+    {
+      enabled: Boolean(workspaceId),
+      refetchInterval: inFlight ? 3000 : false,
+    },
   );
 
   const invalidate = async () => {
@@ -84,8 +90,7 @@ export function FeatureRequestDetailClient({
   );
 
   const credits = workspace?.aiCredits ?? 0;
-  const inFlight = feature ? isInFlightFeatureStatus(feature.status) : false;
-  const billingHref = "/dashboard/billing";
+  const billingHref = BILLING_PATH;
 
   const creditAffordance = (cost: number) =>
     getCreditAffordance({ cost, credits, inFlight, billingHref });

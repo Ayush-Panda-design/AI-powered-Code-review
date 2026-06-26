@@ -35,6 +35,7 @@ async function assertFeatureAccess(featureRequestId: string, userId: string) {
 }
 
 async function requireCreditsForFeature(featureRequestId: string, cost: number) {
+  // Pre-check only — credits are deducted once in the Inngest worker, not here.
   const resolution = await resolveWorkspaceIdForFeature(featureRequestId);
   if (!resolution.ok) {
     throw new TRPCError({

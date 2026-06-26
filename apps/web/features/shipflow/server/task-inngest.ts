@@ -13,6 +13,7 @@ import {
 } from "@/features/shipflow/server/job-results";
 import { generateTasksFromPrd } from "./ai";
 
+/** Deducts AI_CREDIT_COSTS.tasks in chargeFeatureCreditsForJob before generating tasks. */
 export const generateTasks = inngest.createFunction(
   {
     id: "generate-tasks",

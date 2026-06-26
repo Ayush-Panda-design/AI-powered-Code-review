@@ -1,5 +1,7 @@
 import { AI_CREDIT_COSTS } from "@repo/services/constants";
 
+import { BILLING_PATH } from "@/features/dashboard/lib/routes";
+
 type CreditHintOptions = {
   cost: number;
   credits: number;
@@ -11,7 +13,7 @@ export function getCreditAffordance({
   cost,
   credits,
   inFlight,
-  billingHref = "/dashboard/billing",
+  billingHref = BILLING_PATH,
 }: CreditHintOptions) {
   if (inFlight) {
     return {
@@ -35,11 +37,16 @@ export function getCreditAffordance({
 
 export const AI_JOB_TOAST_PREFIX = "ai-job";
 
-export function aiJobToastId(featureId: string, action: string) {
-  return `${AI_JOB_TOAST_PREFIX}-${featureId}-${action}`;
+function sanitizeToastSegment(value: string) {
+  return value.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 64);
 }
 
-const MIN_AI_ACTION_COST = Math.min(
+export function aiJobToastId(featureId: string, action: string) {
+  return `${AI_JOB_TOAST_PREFIX}-${sanitizeToastSegment(featureId)}-${sanitizeToastSegment(action)}`;
+}
+
+/** Minimum credits for clarify, PRD, or tasks — used by the low-credits banner only. */
+const CLARIFY_PRD_TASKS_MIN_CREDIT_COST = Math.min(
   AI_CREDIT_COSTS.clarify,
   AI_CREDIT_COSTS.prd,
   AI_CREDIT_COSTS.tasks,
@@ -49,13 +56,13 @@ export function getLowCreditsBannerMessage(
   credits: number,
   hasLinkedPullRequests: boolean,
 ) {
-  if (credits < MIN_AI_ACTION_COST) {
+  if (credits < CLARIFY_PRD_TASKS_MIN_CREDIT_COST) {
     return {
       show: true,
       message:
         credits === 0
           ? "You have no AI credits left. AI actions are disabled until you upgrade."
-          : `You need at least ${MIN_AI_ACTION_COST} AI credits for clarify, PRD, or tasks (you have ${credits}).`,
+          : `You need at least ${CLARIFY_PRD_TASKS_MIN_CREDIT_COST} AI credits for clarify, PRD, or tasks (you have ${credits}).`,
     };
   }
 

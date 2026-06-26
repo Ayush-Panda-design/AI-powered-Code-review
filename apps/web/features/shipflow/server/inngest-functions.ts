@@ -13,6 +13,7 @@ import {
 } from "@/features/shipflow/server/job-results";
 import { generateClarificationQuestions, generatePrdFromRequest } from "./ai";
 
+/** Deducts AI_CREDIT_COSTS.clarify / .prd via chargeFeatureCreditsForJob before AI work. */
 export const clarifyFeatureRequest = inngest.createFunction(
   {
     id: "clarify-feature-request",

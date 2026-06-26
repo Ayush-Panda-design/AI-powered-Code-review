@@ -18,6 +18,7 @@ export type DashboardRoute = {
 };
 
 export const DASHBOARD_BASE_PATH = "/dashboard";
+export const BILLING_PATH = `${DASHBOARD_BASE_PATH}/billing`;
 
 export const dashboardRoutes: DashboardRoute[] = [
   {
@@ -49,7 +50,7 @@ export const dashboardRoutes: DashboardRoute[] = [
   },
   {
     title: "Billing",
-    href: `${DASHBOARD_BASE_PATH}/billing`,
+    href: BILLING_PATH,
     icon: CreditCard,
   },
   {
