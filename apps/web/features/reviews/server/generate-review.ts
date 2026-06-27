@@ -11,9 +11,10 @@ import {
   countFindings,
 } from "@/features/reviews/types/structured-review";
 
-const ACTIONABLE_RULES = `For every BLOCKING finding you MUST include codeSuggestion: a specific, copy-pasteable code fix (snippet, function body, or diff-style replacement). Never say only "consider refactoring" — show exactly what to change.
+const ACTIONABLE_RULES = `For every finding that implies a code change, include codeSuggestion: a specific, copy-pasteable fix (snippet, function body, or diff-style replacement). Never say only "consider refactoring" — show exactly what to change.
 
-For non_blocking findings, codeSuggestion is optional.`;
+- blocking: codeSuggestion is REQUIRED on every finding.
+- non_blocking: codeSuggestion is REQUIRED whenever a concrete improvement can be shown; omit only for purely informational notes with no applicable code change.`;
 
 const GENERIC_REVIEW_SYSTEM_PROMPT = `You are an expert code reviewer. Review pull request changes for correctness, security, performance, and maintainability.
 
@@ -190,7 +191,7 @@ ${formatTaskContext(reviewContext)}
 **Relevant diff context (semantic search):**
 ${diffContext}
 
-Return structured findings with codeSuggestion on every blocking issue. Set confidenceScore 0-100.`
+Return structured findings. Include codeSuggestion on every blocking issue and on non_blocking issues whenever a concrete code fix applies. Set confidenceScore 0-100.`
     : `Review this pull request.
 
 **Title:** ${title}
@@ -198,7 +199,7 @@ Return structured findings with codeSuggestion on every blocking issue. Set conf
 **Relevant diff context (semantic search):**
 ${diffContext}
 
-Return structured findings with codeSuggestion on every blocking issue. Set confidenceScore 0-100.`;
+Return structured findings. Include codeSuggestion on every blocking issue and on non_blocking issues whenever a concrete code fix applies. Set confidenceScore 0-100.`;
 
   const { object } = await generateObject({
     model,
