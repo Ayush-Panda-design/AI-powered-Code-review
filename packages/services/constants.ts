@@ -4,8 +4,10 @@ export const FEATURE_STATUSES = [
   "prd_generating",
   "prd_ready",
   "planning",
+  "awaiting_plan_approval",
   "in_development",
   "in_review",
+  "release_checking",
   "fix_needed",
   "awaiting_approval",
   "shipped",
@@ -51,6 +53,7 @@ export const IN_FLIGHT_FEATURE_STATUSES = [
   "prd_generating",
   "planning",
   "in_review",
+  "release_checking",
 ] as const;
 
 export function isInFlightFeatureStatus(status: string) {

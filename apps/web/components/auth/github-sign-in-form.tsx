@@ -1,10 +1,10 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
-import { authClient } from "@/lib/auth-client";
+import { signInWithGithubAction } from "@/lib/actions/auth";
 import { resolveCallbackUrl } from "@/lib/auth-proxy";
 
 function GithubIcon({ className }: { className?: string }) {
@@ -23,16 +23,12 @@ function GithubIcon({ className }: { className?: string }) {
 function GithubSignInFormContent() {
   const searchParams = useSearchParams();
   const callbackUrl = resolveCallbackUrl(searchParams.get("callbackUrl"));
+  const [isPending, startTransition] = useTransition();
 
-  const handleSignIn = async () => {
-    try {
-      await authClient.signIn.social({
-        provider: "github",
-        callbackURL: callbackUrl,
-      });
-    } catch (error) {
-      console.error("GitHub sign-in failed:", error);
-    }
+  const handleSignIn = () => {
+    startTransition(() => {
+      void signInWithGithubAction(callbackUrl);
+    });
   };
 
   return (
@@ -40,10 +36,11 @@ function GithubSignInFormContent() {
       type="button"
       variant="outline"
       className="w-full gap-2"
+      disabled={isPending}
       onClick={handleSignIn}
     >
       <GithubIcon className="size-4" />
-      Sign in with GitHub
+      {isPending ? "Redirecting to GitHub…" : "Sign in with GitHub"}
     </Button>
   );
 }

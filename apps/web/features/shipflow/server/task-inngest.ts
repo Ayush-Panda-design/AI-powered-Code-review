@@ -35,7 +35,7 @@ export const generateTasks = inngest.createFunction(
 
     const tasks = await generateTasksFromPrd(feature.prd.rawMarkdown);
     await createTasks(featureRequestId, tasks);
-    await updateFeatureStatus(featureRequestId, "in_development");
+    await updateFeatureStatus(featureRequestId, "awaiting_plan_approval");
 
     return { ok: true, count: tasks.length };
   },

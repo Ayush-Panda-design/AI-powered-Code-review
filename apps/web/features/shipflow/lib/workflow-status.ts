@@ -12,8 +12,14 @@ export function describeWorkflowStatus(status: string) {
       return "Fixes in progress. Push commits or run re-review when ready.";
     case "in_review":
       return "AI review running against PRD and acceptance criteria.";
+    case "release_checking":
+      return "AI is assessing release readiness before human approval.";
+    case "awaiting_plan_approval":
+      return "Engineering plan is ready. Approve the task breakdown to start development.";
     case "awaiting_approval":
       return "No blocking issues. A human can approve or reject release.";
+    case "duplicate":
+      return "This request looks similar to an existing feature and was marked as a duplicate.";
     default:
       return null;
   }
@@ -49,9 +55,15 @@ export function getWorkflowProgress(status: string): WorkflowProgress | null {
     },
     in_review: {
       step: 4,
-      totalSteps: 4,
+      totalSteps: 5,
       stepLabel: "AI review",
       description: "Reviewing linked PR against PRD…",
+    },
+    release_checking: {
+      step: 5,
+      totalSteps: 5,
+      stepLabel: "Release readiness",
+      description: "Checking PRD, tasks, and review findings…",
     },
   };
 

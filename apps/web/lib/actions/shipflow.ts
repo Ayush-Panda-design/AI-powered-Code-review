@@ -6,24 +6,26 @@ import { queueReviewForPullRequest } from "@/features/reviews/server/trigger-rev
 import { requestManualReReview } from "@/features/shipflow/server/feature-workflow";
 import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
+import { getActiveWorkspaceForUser, WORKSPACE_COOKIE } from "@/lib/active-workspace";
 import {
   AI_CREDIT_COSTS,
   assertHasCredits,
-  ensureDefaultWorkspace,
+  connectRepositoryToProject,
+  disconnectRepositoryFromProject,
   InsufficientCreditsError,
   resolveWorkspaceIdForFeature,
   sendClarifyJob,
   sendPrdJob,
   sendTasksJob,
+  updateFeatureStatus,
 } from "@repo/services";
 
 export async function ensureWorkspaceAction() {
   const session = await requireSession();
-  const workspace = await ensureDefaultWorkspace(
+  return getActiveWorkspaceForUser(
     session.user.id,
     session.user.name ?? "User",
   );
-  return workspace;
 }
 
 async function assertFeatureCredits(
@@ -154,4 +156,127 @@ export async function requestReReviewAction(featureRequestId: string) {
 
   revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
   revalidatePath("/dashboard/pull-requests");
+}
+
+export async function updatePrdAction(
+  featureRequestId: string,
+  rawMarkdown: string,
+) {
+  const session = await requireSession();
+  const workspace = await getActiveWorkspaceForUser(
+    session.user.id,
+    session.user.name ?? "User",
+  );
+
+  const feature = await prisma.featureRequest.findFirst({
+    where: {
+      id: featureRequestId,
+      project: { workspaceId: workspace.id },
+    },
+    select: { id: true, prd: { select: { id: true } } },
+  });
+
+  if (!feature?.prd) {
+    throw new Error("PRD not found for this feature");
+  }
+
+  const trimmed = rawMarkdown.trim();
+  if (!trimmed) {
+    throw new Error("PRD cannot be empty");
+  }
+
+  await prisma.pRD.update({
+    where: { featureRequestId },
+    data: { rawMarkdown: trimmed },
+  });
+
+  revalidatePath(`/dashboard/prd/${featureRequestId}`);
+  revalidatePath("/dashboard/prd");
+  revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
+}
+
+export async function approvePlanAction(featureRequestId: string) {
+  const session = await requireSession();
+  const workspace = await getActiveWorkspaceForUser(
+    session.user.id,
+    session.user.name ?? "User",
+  );
+
+  const feature = await prisma.featureRequest.findFirst({
+    where: {
+      id: featureRequestId,
+      project: { workspaceId: workspace.id },
+    },
+    select: { status: true },
+  });
+
+  if (!feature || feature.status !== "awaiting_plan_approval") {
+    throw new Error("Feature is not awaiting plan approval");
+  }
+
+  await updateFeatureStatus(featureRequestId, "in_development");
+  revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
+  revalidatePath("/dashboard/tasks");
+}
+
+export async function connectRepositoryAction(
+  projectId: string,
+  repoFullName: string,
+  installationId: number,
+  defaultBranch?: string,
+) {
+  const session = await requireSession();
+  const workspace = await getActiveWorkspaceForUser(
+    session.user.id,
+    session.user.name ?? "User",
+  );
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, workspaceId: workspace.id },
+  });
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  await connectRepositoryToProject({
+    workspaceId: workspace.id,
+    projectId,
+    repoFullName,
+    installationId,
+    defaultBranch,
+  });
+
+  revalidatePath("/dashboard/repositories");
+  revalidatePath("/dashboard/billing");
+}
+
+export async function disconnectRepositoryAction(
+  projectId: string,
+  repoFullName: string,
+) {
+  await requireSession();
+  await disconnectRepositoryFromProject(projectId, repoFullName);
+  revalidatePath("/dashboard/repositories");
+  revalidatePath("/dashboard/billing");
+}
+
+export async function setActiveWorkspaceAction(workspaceId: string) {
+  const session = await requireSession();
+  const workspaces = await import("@repo/services").then((m) =>
+    m.listWorkspacesForUser(session.user.id),
+  );
+  if (!workspaces.some((workspace) => workspace.id === workspaceId)) {
+    throw new Error("Workspace not found");
+  }
+
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  cookieStore.set(WORKSPACE_COOKIE, workspaceId, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+  });
+
+  revalidatePath("/dashboard");
 }

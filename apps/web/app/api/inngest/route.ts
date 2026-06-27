@@ -6,6 +6,7 @@ import {
   clarifyFeatureRequest,
   generatePrd,
 } from "@/features/shipflow/server/inngest-functions";
+import { checkReleaseReadiness } from "@/features/shipflow/server/release-readiness-function";
 import { generateTasks } from "@/features/shipflow/server/task-inngest";
 
 export const { GET, POST, PUT } = serve({
@@ -15,5 +16,6 @@ export const { GET, POST, PUT } = serve({
     clarifyFeatureRequest,
     generatePrd,
     generateTasks,
+    checkReleaseReadiness,
   ],
 });

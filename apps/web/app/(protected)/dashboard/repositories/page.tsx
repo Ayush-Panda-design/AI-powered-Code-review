@@ -8,14 +8,36 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ReposList } from "@/features/dashboard/components/repos-list";
+import { ReposConnectPanel } from "@/features/dashboard/components/repos-connect-panel";
 import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
 import { getInstallationForUser } from "@/features/github/server/installation";
+import { ensureWorkspaceAction } from "@/lib/actions/shipflow";
 import { requireSession } from "@/lib/auth-session";
+import { prisma } from "@/lib/db";
+import { listConnectedRepositoriesForWorkspace } from "@repo/services";
+
+async function getOrCreateDefaultProject(workspaceId: string) {
+  const existing = await prisma.project.findFirst({
+    where: { workspaceId },
+    orderBy: { createdAt: "asc" },
+  });
+  if (existing) return existing;
+
+  return prisma.project.create({
+    data: {
+      workspaceId,
+      name: "Default Project",
+      description: "Main product delivery pipeline",
+    },
+  });
+}
 
 export default async function RepositoriesPage() {
   const session = await requireSession("/dashboard/repositories");
+  const workspace = await ensureWorkspaceAction();
   const installation = await getInstallationForUser(session.user.id);
+  const project = await getOrCreateDefaultProject(workspace.id);
+  const connectedRepos = await listConnectedRepositoriesForWorkspace(workspace.id);
 
   if (!installation) {
     return (
@@ -44,10 +66,19 @@ export default async function RepositoriesPage() {
       <div>
         <h2 className="text-lg font-semibold">Repositories</h2>
         <p className="text-sm text-muted-foreground">
-          Repositories accessible via @{installation.accountLogin}
+          Connect repos to your project for ShipFlow tracking (@
+          {installation.accountLogin})
         </p>
       </div>
-      <ReposList />
+      <ReposConnectPanel
+        projectId={project.id}
+        installationId={installation.installationId}
+        connectedRepos={connectedRepos.map((repo) => ({
+          repoFullName: repo.repoFullName,
+          projectId: repo.projectId,
+        }))}
+        repoLimit={workspace.repoLimit}
+      />
     </div>
   );
 }

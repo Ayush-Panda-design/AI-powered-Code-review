@@ -1,3 +1,6 @@
+import Link from "next/link";
+import { formatDistanceToNow } from "date-fns";
+
 import {
   Card,
   CardContent,
@@ -6,77 +9,18 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
+import type { OverviewData } from "@/features/dashboard/server/overview-data";
 import {
   githubAppStatusStyles,
   statusStyles,
   type ReviewStatus,
 } from "@/features/dashboard/lib/status-styles";
+import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
 import { cn } from "@/lib/utils";
-
-const overviewStats = [
-  {
-    title: "Connected repositories",
-    value: "12",
-    change: "+2 this month",
-  },
-  {
-    title: "Open pull requests",
-    value: "8",
-    change: "3 awaiting review",
-  },
-  {
-    title: "Reviews this week",
-    value: "24",
-    change: "+18% vs last week",
-  },
-  {
-    title: "GitHub App",
-    value: githubAppStatusStyles.connected.label,
-    change: "Installed on Ayush-Panda-design org",
-    status: "connected" as const,
-  },
-];
-
-const recentReviews: Array<{
-  id: string;
-  repository: string;
-  pullRequest: string;
-  status: ReviewStatus;
-  updatedAt: string;
-}> = [
-  {
-    id: "1",
-    repository: "AI-powered-Code-review",
-    pullRequest: "Add dashboard shell and sidebar",
-    status: "in_progress",
-    updatedAt: "12 min ago",
-  },
-  {
-    id: "2",
-    repository: "AI-powered-Code-review",
-    pullRequest: "Configure Better Auth with Neon",
-    status: "approved",
-    updatedAt: "2 hours ago",
-  },
-  {
-    id: "3",
-    repository: "portfolio-site",
-    pullRequest: "Fix mobile navigation overlap",
-    status: "changes_requested",
-    updatedAt: "Yesterday",
-  },
-  {
-    id: "4",
-    repository: "api-gateway",
-    pullRequest: "Upgrade Prisma to v7",
-    status: "pending",
-    updatedAt: "2 days ago",
-  },
-];
 
 function StatusBadge({ status }: { status: ReviewStatus }) {
   const style = statusStyles[status];
-
   return (
     <Badge variant="outline" className={cn("font-medium", style.badgeClassName)}>
       {style.label}
@@ -84,11 +28,45 @@ function StatusBadge({ status }: { status: ReviewStatus }) {
   );
 }
 
-export function OverviewContent() {
+export function OverviewContent({ data }: { data: OverviewData }) {
+  const stats = [
+    {
+      title: "Connected repositories",
+      value: String(data.connectedRepos),
+      change: `${data.connectedRepos} / ${data.repoLimit} plan limit`,
+    },
+    {
+      title: "Open pull requests",
+      value: String(data.openPullRequests),
+      change:
+        data.openPullRequests === 0
+          ? "No PRs awaiting review"
+          : "Pending or in review",
+    },
+    {
+      title: "Reviews this week",
+      value: String(data.reviewsThisWeek),
+      change: `${data.prdCount} PRDs · ${data.featureRequestCount} features`,
+    },
+    {
+      title: "Awaiting release",
+      value: String(data.awaitingApprovalCount),
+      change: data.githubApp.detail,
+      status: data.githubApp.status,
+    },
+  ];
+
   return (
     <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-2xl font-semibold">Overview</h1>
+        <p className="text-sm text-muted-foreground">
+          ShipFlow delivery pipeline at a glance
+        </p>
+      </div>
+
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {overviewStats.map((stat) => (
+        {stats.map((stat) => (
           <Card key={stat.title} size="sm">
             <CardHeader>
               <CardDescription>{stat.title}</CardDescription>
@@ -101,8 +79,8 @@ export function OverviewContent() {
                 <Badge
                   variant="outline"
                   className={cn(
-                    "font-medium",
-                    githubAppStatusStyles[stat.status].badgeClassName
+                    "mb-2 font-medium",
+                    githubAppStatusStyles[stat.status].badgeClassName,
                   )}
                 >
                   {githubAppStatusStyles[stat.status].label}
@@ -115,27 +93,52 @@ export function OverviewContent() {
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Recent reviews</CardTitle>
-          <CardDescription>
-            Mock activity feed for connected repositories and pull requests.
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between gap-4">
+          <div>
+            <CardTitle>Recent reviews</CardTitle>
+            <CardDescription>
+              Latest AI reviews across your connected repositories
+            </CardDescription>
+          </div>
+          <Link
+            href={`${DASHBOARD_BASE_PATH}/review-history`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            View all
+          </Link>
         </CardHeader>
         <CardContent className="space-y-4">
-          {recentReviews.map((review) => (
-            <div
-              key={review.id}
-              className="flex flex-col gap-3 rounded-xl border border-border/60 p-4 sm:flex-row sm:items-center sm:justify-between"
-            >
-              <div className="space-y-1">
-                <p className="font-medium">{review.pullRequest}</p>
-                <p className="text-sm text-muted-foreground">
-                  {review.repository} · {review.updatedAt}
-                </p>
+          {data.recentReviews.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              No AI reviews yet. Connect the GitHub App and open a pull request.
+            </p>
+          ) : (
+            data.recentReviews.map((review) => (
+              <div
+                key={review.id}
+                className="flex flex-col gap-3 rounded-xl border border-border/60 p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div className="space-y-1">
+                  <p className="font-medium">{review.pullRequest}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {review.repository} #{review.prNumber} ·{" "}
+                    {formatDistanceToNow(review.updatedAt, { addSuffix: true })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {review.blockingCount > 0 && (
+                    <Badge
+                      variant="outline"
+                      className="border-destructive/40 bg-destructive/10 text-destructive"
+                    >
+                      {review.blockingCount} blocking
+                    </Badge>
+                  )}
+                  <StatusBadge status={review.status} />
+                </div>
               </div>
-              <StatusBadge status={review.status} />
-            </div>
-          ))}
+            ))
+          )}
         </CardContent>
       </Card>
     </div>

@@ -168,6 +168,20 @@ export function ReleaseApprovalPanel({
     );
   }
 
+  if (status === "release_checking") {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">Release readiness check</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm text-muted-foreground">
+          AI is assessing PRD coverage, tasks, and review findings before human
+          approval. This page refreshes automatically.
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (status !== "awaiting_approval") {
     return null;
   }

@@ -21,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { GitHubReposPage } from "@/features/github/types";
+import type { GitHubRepo, GitHubReposPage } from "@/features/github/types";
 import { cn } from "@/lib/utils";
 
 async function fetchReposPage(page: number): Promise<GitHubReposPage> {
@@ -44,7 +44,11 @@ function formatUpdatedAt(value: string) {
   }).format(new Date(value));
 }
 
-export function ReposList() {
+export function ReposList({
+  renderActions,
+}: {
+  renderActions?: (repo: GitHubRepo) => React.ReactNode;
+}) {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -145,6 +149,7 @@ export function ReposList() {
             <TableHead>Language</TableHead>
             <TableHead className="text-right">Stars</TableHead>
             <TableHead>Updated</TableHead>
+            {renderActions ? <TableHead className="text-right">Actions</TableHead> : null}
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -175,6 +180,9 @@ export function ReposList() {
               <TableCell className="text-muted-foreground">
                 {formatUpdatedAt(repo.updatedAt)}
               </TableCell>
+              {renderActions ? (
+                <TableCell className="text-right">{renderActions(repo)}</TableCell>
+              ) : null}
             </TableRow>
           ))}
         </TableBody>

@@ -50,6 +50,7 @@ export const clarifyFeatureRequest = inngest.createFunction(
     );
 
     await addClarification(featureRequestId, "assistant", questions);
+    await updateFeatureStatus(featureRequestId, "draft");
 
     return { ok: true, questions };
   },

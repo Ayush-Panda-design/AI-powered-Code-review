@@ -8,6 +8,7 @@ import {
   SidebarTrigger,
 } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "@/features/dashboard/components/dashboard-sidebar";
+import { WorkspaceSwitcher } from "@/features/dashboard/components/workspace-switcher";
 import { getDashboardRoute } from "@/features/dashboard/lib/routes";
 import { usePathname } from "next/navigation";
 
@@ -18,15 +19,25 @@ type DashboardShellProps = {
     email?: string | null;
     image?: string | null;
   };
+  workspaces: { id: string; name: string }[];
+  activeWorkspaceId: string;
 };
 
-export function DashboardShell({ children, user }: DashboardShellProps) {
+export function DashboardShell({
+  children,
+  user,
+  workspaces,
+  activeWorkspaceId,
+}: DashboardShellProps) {
   const pathname = usePathname();
   const currentRoute = getDashboardRoute(pathname);
 
   return (
     <SidebarProvider>
-      <DashboardSidebar />
+      <DashboardSidebar
+        workspaces={workspaces}
+        activeWorkspaceId={activeWorkspaceId}
+      />
       <SidebarInset>
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
