@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { Bot } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  DashboardListFilters,
+  filterBySearch,
+} from "@/features/dashboard/components/dashboard-list-filters";
 import { FeatureStatusBadge } from "@/features/shipflow/components/feature-status-badge";
 import { trpc } from "@/trpc/client";
 import { cn } from "@/lib/utils";
@@ -22,6 +27,9 @@ type TaskBoardProps = {
 };
 
 export function TaskBoard({ projectId }: TaskBoardProps) {
+  const [search, setSearch] = useState("");
+  const [columnFilter, setColumnFilter] = useState("all");
+
   const utils = trpc.useUtils();
   const { data: tasks = [], isLoading } = trpc.task.kanban.useQuery({ projectId });
 
@@ -55,29 +63,81 @@ export function TaskBoard({ projectId }: TaskBoardProps) {
     onError: (error) => toast.error(error.message),
   });
 
+  const codegen = trpc.task.triggerCodegen.useMutation({
+    onSuccess: async (result) => {
+      toast.success(result.message);
+      await invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading tasks…</p>;
   }
 
+  const filteredTasks = useMemo(() => {
+    let items = filterBySearch(tasks, search, (task) =>
+      [
+        task.title,
+        task.description ?? "",
+        task.featureRequest.title,
+        task.status,
+        task.featureRequest.status,
+      ].join(" "),
+    );
+
+    if (columnFilter !== "all") {
+      items = items.filter((task) => task.status === columnFilter);
+    }
+
+    return items;
+  }, [tasks, search, columnFilter]);
+
   const sameFeatureTasks = (taskId: string, featureId: string) =>
-    tasks.filter(
+    filteredTasks.filter(
       (task) => task.featureRequest.id === featureId && task.id !== taskId,
     );
 
+  const visibleColumns =
+    columnFilter === "all"
+      ? columns
+      : columns.filter((column) => column.key === columnFilter);
+
   return (
     <div className="space-y-4">
+      <DashboardListFilters
+        search={search}
+        onSearchChange={setSearch}
+        searchPlaceholder="Search task, feature, status…"
+        resultCount={filteredTasks.length}
+        totalCount={tasks.length}
+      >
+        <select
+          value={columnFilter}
+          onChange={(event) => setColumnFilter(event.target.value)}
+          className="h-9 rounded-md border bg-background px-3 text-sm"
+        >
+          <option value="all">All columns</option>
+          {columns.map((column) => (
+            <option key={column.key} value={column.key}>
+              {column.label}
+            </option>
+          ))}
+        </select>
+      </DashboardListFilters>
+
       <p className="text-sm text-muted-foreground">
         Move tasks between columns, merge related tasks, or split one task into
         subtasks.
       </p>
-      <div className="grid gap-4 md:grid-cols-3">
-        {columns.map((column) => (
+      <div className="grid max-h-[min(70vh,720px)] gap-4 overflow-auto md:grid-cols-3">
+        {visibleColumns.map((column) => (
           <Card key={column.key}>
             <CardHeader>
               <CardTitle className="text-sm">{column.label}</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              {tasks
+              {filteredTasks
                 .filter((task) => task.status === column.key)
                 .map((task) => (
                   <div
@@ -92,6 +152,14 @@ export function TaskBoard({ projectId }: TaskBoardProps) {
                       {task.featureRequest.title}
                     </Link>
                     <FeatureStatusBadge status={task.featureRequest.status} />
+                    {"codeGenStatus" in task && task.codeGenStatus !== "none" ? (
+                      <p className="text-xs text-violet-600">
+                        <Bot className="mr-1 inline size-3" />
+                        {task.codeGenStatus === "generating"
+                          ? "Generating draft PR…"
+                          : "Draft PR open"}
+                      </p>
+                    ) : null}
 
                     <div className="flex flex-wrap gap-1 pt-1">
                       {columns
@@ -145,6 +213,21 @@ export function TaskBoard({ projectId }: TaskBoardProps) {
                       >
                         {splitTaskId === task.id ? "Cancel split" : "Split…"}
                       </Button>
+                      {"aiGeneratable" in task &&
+                      task.aiGeneratable !== false &&
+                      task.codeGenStatus === "none" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 text-xs"
+                          disabled={codegen.isPending}
+                          onClick={() => codegen.mutate({ taskId: task.id })}
+                        >
+                          <Bot className="size-3" />
+                          Generate
+                        </Button>
+                      ) : null}
                     </div>
 
                     {mergeSourceId === task.id && (

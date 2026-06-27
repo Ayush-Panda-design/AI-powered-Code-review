@@ -1,7 +1,7 @@
 import { betterAuth } from "better-auth/minimal";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
-import { getPrismaClient } from "@repo/database";
+import { prisma } from "@repo/database";
 
 import { getAuthConfigErrors } from "@/lib/auth-config";
 import {
@@ -26,7 +26,7 @@ export const auth = betterAuth({
     protocol: getAuthProtocol(),
     fallback: getAuthBaseUrl(),
   },
-  database: prismaAdapter(getPrismaClient(), {
+  database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
   emailAndPassword: {

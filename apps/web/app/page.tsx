@@ -148,6 +148,11 @@ export default async function Home() {
                 PR-aware AI reviews
               </li>
             </ul>
+            <p className="mt-6 text-sm">
+              <Link href="/tech-stack" className="text-violet-600 underline dark:text-violet-400">
+                View full technology stack →
+              </Link>
+            </p>
           </div>
         </section>
       </main>

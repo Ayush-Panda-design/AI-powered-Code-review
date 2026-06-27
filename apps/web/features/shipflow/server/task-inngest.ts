@@ -24,6 +24,12 @@ export const generateTasks = inngest.createFunction(
     const feature = await getFeatureRequest(featureRequestId);
     if (!feature) return shipflowFeatureNotFound();
     if (!feature.prd) return shipflowPrdNotFound();
+    if (feature.prd.status !== "approved") {
+      return { ok: false, reason: "prd_not_approved" };
+    }
+    if (feature.status !== "prd_ready") {
+      return { ok: false, reason: "feature_not_prd_ready" };
+    }
 
     const creditError = await chargeFeatureCreditsForJob(
       feature.project.workspaceId,

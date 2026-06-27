@@ -86,8 +86,8 @@ function RejectReleaseForm({
       }}
     >
       <p className="text-sm text-muted-foreground">
-        Reject to send the feature back for fixes (status → fix needed). Notes are
-        required for the audit trail.
+        Reject to mark the feature as rejected (terminal). Notes are required for
+        the audit trail.
       </p>
       <Textarea
         name="rejectNotes"

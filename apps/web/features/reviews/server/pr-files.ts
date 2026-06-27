@@ -31,5 +31,19 @@ export async function getPullRequestFiles(
     .map((file) => ({
       filename: file.filename,
       patch: file.patch as string,
+      additions: file.additions,
+      deletions: file.deletions,
     }));
+}
+
+export async function getPullRequestFileMetrics(
+  installationId: number,
+  repoFullName: string,
+  prNumber: number,
+) {
+  const files = await getPullRequestFiles(installationId, repoFullName, prNumber);
+  const filesChanged = files.length;
+  const additions = files.reduce((sum, file) => sum + (file.additions ?? 0), 0);
+  const deletions = files.reduce((sum, file) => sum + (file.deletions ?? 0), 0);
+  return { files, filesChanged, additions, deletions, linesChanged: additions + deletions };
 }

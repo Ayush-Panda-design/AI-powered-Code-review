@@ -34,6 +34,10 @@ export async function getFeatureRequest(id: string) {
         },
       },
       approvals: { orderBy: { createdAt: "desc" }, include: { reviewer: { select: { name: true, email: true } } } },
+      planApprovals: {
+        orderBy: { createdAt: "asc" },
+        include: { reviewer: { select: { id: true, name: true, email: true } } },
+      },
     },
   });
 }

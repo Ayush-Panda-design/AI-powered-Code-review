@@ -3,6 +3,7 @@ import { revalidatePath } from "next/cache";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WorkspaceSwitcher } from "@/features/dashboard/components/workspace-switcher";
+import { WorkspaceMembersPanel } from "@/features/dashboard/components/workspace-members-panel";
 import { ensureWorkspaceAction, setActiveWorkspaceAction } from "@/lib/actions/shipflow";
 import { requireSession } from "@/lib/auth-session";
 import { createWorkspace, listWorkspacesForUser } from "@repo/services";
@@ -47,6 +48,8 @@ export default async function WorkspacesPage() {
           />
         </CardContent>
       </Card>
+
+      <WorkspaceMembersPanel workspaceId={activeWorkspace.id} />
 
       <Card>
         <CardHeader>

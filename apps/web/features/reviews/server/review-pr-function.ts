@@ -1,6 +1,8 @@
 import { inngest, type GitHubPrReceivedEvent } from "@/features/inngest/client";
 import {
   AI_CREDIT_COSTS,
+  loadMutedCategories,
+  loadReviewRulesForWorkspace,
   resolveWorkspaceIdForFeature,
   resolveWorkspaceIdForInstallation,
   tryConsumeCredits,
@@ -14,16 +16,35 @@ import { loadReviewContext } from "@/features/reviews/server/load-review-context
 import {
   markFeatureInReview,
   persistReviewResult,
+  trySavePrMetrics,
 } from "@/features/reviews/server/persist-review";
 import { getPullRequestFiles } from "@/features/reviews/server/pr-files";
 import { postPrComment } from "@/features/reviews/server/pr-comment";
 import {
+  applyCommentBudget,
+  buildReviewChangeSummary,
+  computePrSizeMetrics,
+  filterSuppressedFindings,
+  suggestPrSplit,
+} from "@/features/reviews/server/review-noise";
+import { parseFindings } from "@/features/reviews/types/structured-review";
+import {
   buildPrNamespace,
-  saveChunksToPinecone,
-  searchPrContext,
+  resolvePrContextChunks,
 } from "@/features/reviews/server/vectors";
 import { chunkPrFiles } from "@/features/reviews/utils/chunk-code";
 import { prisma } from "@/lib/db";
+
+async function updateReviewStage(pullRequestId: string, stage: string) {
+  try {
+    await prisma.pullRequest.update({
+      where: { id: pullRequestId },
+      data: { reviewComment: `Review in progress: ${stage}` },
+    });
+  } catch {
+    // Non-critical progress hint.
+  }
+}
 
 async function markPullRequestFailed(
   repoFullName: string,
@@ -48,6 +69,7 @@ export const reviewPullRequest = inngest.createFunction(
   {
     id: "review-pull-request",
     retries: 3,
+    timeouts: { finish: "20m" },
     triggers: [{ event: "github/pr.received" }],
     onFailure: async ({ event, error }) => {
       const originalEvent = event.data.event;
@@ -119,19 +141,29 @@ export const reviewPullRequest = inngest.createFunction(
       return loadReviewContext(pullRequest.featureRequestId);
     });
 
-    const chunks = await step.run("fetch-and-chunk", async () => {
+    const fetchResult = await step.run("fetch-and-chunk", async () => {
+      await updateReviewStage(pullRequest.id, "fetching changed files");
+
       const files = await getPullRequestFiles(
         installationId,
         repoFullName,
         prNumber
       );
-      return chunkPrFiles(prNumber, files);
+
+      return {
+        chunks: chunkPrFiles(prNumber, files),
+        metrics: computePrSizeMetrics(files),
+      };
     });
+
+    const { chunks, metrics: prMetrics } = fetchResult;
 
     if (chunks.length === 0) {
       await step.run("mark-reviewed-no-code", async () => {
         const comment =
           "No reviewable code changes found in this pull request.";
+
+        await trySavePrMetrics(pullRequest.id, prMetrics);
 
         await persistReviewResult({
           pullRequestId: pullRequest.id,
@@ -154,19 +186,82 @@ export const reviewPullRequest = inngest.createFunction(
 
     const namespace = buildPrNamespace(repoFullName, prNumber);
 
-    await step.run("save-chunks-to-pinecone", async () => {
-      await saveChunksToPinecone(namespace, chunks);
-    });
-
-    await step.sleep("wait-for-pinecone-indexing", "10s");
-
-    const contextChunks = await step.run("search-pr-context", async () => {
-      return searchPrContext(namespace, title, 5);
+    const contextChunks = await step.run("resolve-pr-context", async () => {
+      await updateReviewStage(pullRequest.id, "selecting relevant code");
+      return resolvePrContextChunks(namespace, chunks, title, 5);
     });
 
     const enrichedReview = await step.run("generate-review", async () => {
-      const review = await generateReview(title, contextChunks, reviewContext);
-      return enrichReview(review);
+      await updateReviewStage(pullRequest.id, "running AI analysis");
+      const workspaceId =
+        (await resolveWorkspaceIdForInstallation(installationId)) ?? undefined;
+
+      let rules: Awaited<ReturnType<typeof loadReviewRulesForWorkspace>> = [];
+      let mutedCategories: string[] = [];
+
+      try {
+        [rules, mutedCategories] = await Promise.all([
+          workspaceId
+            ? loadReviewRulesForWorkspace(workspaceId, repoFullName)
+            : Promise.resolve([]),
+          workspaceId
+            ? loadMutedCategories(workspaceId)
+            : Promise.resolve([] as string[]),
+        ]);
+      } catch {
+        // Learned rules are optional until migration is applied.
+      }
+
+      const previousReview = await prisma.aIReview.findFirst({
+        where: { pullRequestId: pullRequest.id },
+        orderBy: { createdAt: "desc" },
+        select: { findings: true },
+      });
+
+      const review = await generateReview(title, contextChunks, reviewContext, {
+        suppressedPatterns: rules.map((rule) => rule.pattern),
+        mutedCategories,
+      });
+
+      const filtered = filterSuppressedFindings(
+        review.findings,
+        rules,
+        mutedCategories,
+      );
+      const budgeted = applyCommentBudget(filtered);
+
+      let summary = review.summary;
+      if (budgeted.droppedNonBlockingCount > 0) {
+        summary += `\n\n_Note: ${budgeted.droppedNonBlockingCount} lower-confidence non-blocking finding(s) omitted to reduce review noise._`;
+      }
+
+      if (prMetrics.sizeWarning) {
+        const splitTips = suggestPrSplit(
+          prMetrics.filesChanged,
+          prMetrics.linesChanged,
+        );
+        if (splitTips) {
+          summary += `\n\n⚠️ **Large PR** — consider splitting:\n${splitTips.map((tip) => `- ${tip}`).join("\n")}`;
+        }
+      }
+
+      if (previousReview) {
+        const changeSummary = buildReviewChangeSummary(
+          parseFindings(previousReview.findings),
+          budgeted.findings,
+        );
+        if (changeSummary.resolved.length > 0 || changeSummary.newIssues.length > 0) {
+          summary += `\n\n**Since last review:** ${changeSummary.resolved.length} resolved, ${changeSummary.newIssues.length} new issue(s).`;
+        }
+      }
+
+      const enriched = enrichReview({
+        ...review,
+        summary,
+        findings: budgeted.findings,
+      });
+
+      return enriched;
     });
 
     const commentBody = formatReviewComment(enrichedReview.review, {
@@ -176,11 +271,12 @@ export const reviewPullRequest = inngest.createFunction(
       prdAware: Boolean(reviewContext.featureRequestId && reviewContext.prd),
     });
 
-    await step.run("post-pr-comment", async () => {
-      await postPrComment(installationId, repoFullName, prNumber, commentBody);
-    });
-
     await step.run("persist-review", async () => {
+      await updateReviewStage(pullRequest.id, "saving results");
+      const workspaceId = await resolveWorkspaceIdForInstallation(installationId);
+
+      await trySavePrMetrics(pullRequest.id, prMetrics);
+
       await persistReviewResult({
         pullRequestId: pullRequest.id,
         featureRequestId: pullRequest.featureRequestId,
@@ -189,7 +285,16 @@ export const reviewPullRequest = inngest.createFunction(
         nonBlockingCount: enrichedReview.nonBlockingCount,
         confidenceScore: enrichedReview.confidenceScore,
         reviewComment: commentBody,
+        workspaceId,
       });
+    });
+
+    await step.run("post-pr-comment", async () => {
+      try {
+        await postPrComment(installationId, repoFullName, prNumber, commentBody);
+      } catch (error) {
+        console.error("[review] GitHub comment failed:", error);
+      }
     });
 
     return {
@@ -200,3 +305,4 @@ export const reviewPullRequest = inngest.createFunction(
     };
   }
 );
+

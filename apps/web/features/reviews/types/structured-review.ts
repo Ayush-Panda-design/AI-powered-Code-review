@@ -7,7 +7,11 @@ export type ReviewFinding = {
   title: string;
   description: string;
   filePath?: string;
-  /** Concrete code fix for blocking issues — patch snippet or replacement code */
+  lineStart?: number;
+  lineEnd?: number;
+  /** Per-finding confidence 0–100 (how sure the AI is about this issue) */
+  confidence?: number;
+  /** Concrete code fix — patch snippet or replacement code */
   codeSuggestion?: string;
 };
 
@@ -102,4 +106,16 @@ export function diffReviewFindings(
     newIssues: current.filter((finding) => !prevKeys.has(key(finding))),
     unchanged: current.filter((finding) => prevKeys.has(key(finding))),
   };
+}
+
+export function sortFindingsByConfidence(findings: ReviewFinding[]) {
+  return [...findings].sort((left, right) => {
+    if (left.severity === "blocking" && right.severity !== "blocking") {
+      return -1;
+    }
+    if (right.severity === "blocking" && left.severity !== "blocking") {
+      return 1;
+    }
+    return (right.confidence ?? 50) - (left.confidence ?? 50);
+  });
 }

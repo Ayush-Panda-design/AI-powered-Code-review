@@ -3,8 +3,13 @@ import {
   createWorkspace,
   ensureDefaultWorkspace,
   getWorkspaceForUser,
+  inviteWorkspaceMember,
+  listActivityEvents,
+  listWorkspaceInvites,
+  listWorkspaceMembers,
   listWorkspacesForUser,
 } from "@repo/services";
+import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../../trpc";
 
 export const workspaceRouter = router({
@@ -32,5 +37,82 @@ export const workspaceRouter = router({
         throw new Error("Workspace not found");
       }
       return workspace;
+    }),
+
+  listActivity: protectedProcedure
+    .input(z.object({ workspaceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const workspace = await getWorkspaceForUser(input.workspaceId, ctx.userId);
+      if (!workspace) {
+        throw new Error("Workspace not found");
+      }
+      const events = await listActivityEvents(input.workspaceId);
+      return events.map((event) => ({
+        ...event,
+        createdAt: event.createdAt.toISOString(),
+      }));
+    }),
+
+  listMembers: protectedProcedure
+    .input(z.object({ workspaceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const workspace = await getWorkspaceForUser(input.workspaceId, ctx.userId);
+      if (!workspace) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const members = await listWorkspaceMembers(input.workspaceId);
+      return members.map((member) => ({
+        id: member.id,
+        role: member.role,
+        user: member.user,
+        createdAt: member.createdAt.toISOString(),
+      }));
+    }),
+
+  listInvites: protectedProcedure
+    .input(z.object({ workspaceId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const workspace = await getWorkspaceForUser(input.workspaceId, ctx.userId);
+      if (!workspace) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const invites = await listWorkspaceInvites(input.workspaceId);
+      return invites.map((invite) => ({
+        id: invite.id,
+        email: invite.email,
+        role: invite.role,
+        expiresAt: invite.expiresAt.toISOString(),
+        createdAt: invite.createdAt.toISOString(),
+      }));
+    }),
+
+  inviteMember: protectedProcedure
+    .input(
+      z.object({
+        workspaceId: z.string(),
+        email: z.string().email(),
+        role: z.enum(["member", "owner"]).default("member"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const workspace = await getWorkspaceForUser(input.workspaceId, ctx.userId);
+      if (!workspace) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const baseUrl =
+        process.env.BETTER_AUTH_URL?.trim() ||
+        process.env.NEXT_PUBLIC_APP_URL?.trim() ||
+        "http://localhost:3000";
+
+      return inviteWorkspaceMember({
+        workspaceId: input.workspaceId,
+        invitedById: ctx.userId,
+        email: input.email,
+        role: input.role,
+        appBaseUrl: baseUrl,
+      });
     }),
 });

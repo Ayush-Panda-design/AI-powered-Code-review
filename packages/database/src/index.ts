@@ -124,18 +124,31 @@ function isClientComplete(client: PrismaClient) {
     return false;
   }
 
-  // Bust stale dev singletons when the schema gains new AIReview fields.
   const runtime = client as unknown as {
     _runtimeDataModel?: {
       models?: Record<string, { fields?: Array<{ name: string }> }>;
     };
   };
-  const aiReviewFields = runtime._runtimeDataModel?.models?.AIReview?.fields;
-  if (!aiReviewFields) {
+  const models = runtime._runtimeDataModel?.models;
+  if (!models) {
     return true;
   }
 
-  return aiReviewFields.some((field) => field.name === "confidenceScore");
+  const aiReviewFields = models.AIReview?.fields ?? [];
+  const pullRequestFields = models.PullRequest?.fields ?? [];
+  const workspaceFields = models.Workspace?.fields ?? [];
+
+  const hasConfidenceScore = aiReviewFields.some(
+    (field) => field.name === "confidenceScore",
+  );
+  const hasPrSizeFields = pullRequestFields.some(
+    (field) => field.name === "filesChanged",
+  );
+  const hasWorkspaceReviewSettings = workspaceFields.some(
+    (field) => field.name === "mutedReviewCategories",
+  );
+
+  return hasConfidenceScore && hasPrSizeFields && hasWorkspaceReviewSettings;
 }
 
 function getPrismaClient() {
@@ -175,17 +188,55 @@ export async function invalidateDbConnection() {
   }
 }
 
-export async function withDbRetry<T>(operation: () => Promise<T>) {
-  try {
-    return await operation();
-  } catch (error) {
-    if (!isConnectionError(error)) {
-      throw error;
-    }
-
-    await invalidateDbConnection();
-    return operation();
+function isSchemaDriftError(error: unknown) {
+  if (!(error instanceof Error)) {
+    return false;
   }
+
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("does not exist") ||
+    message.includes("unknown argument") ||
+    message.includes("column") && message.includes("not available")
+  );
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function withDbRetry<T>(
+  operation: () => Promise<T>,
+  options?: { attempts?: number },
+) {
+  const attempts = options?.attempts ?? 3;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (isSchemaDriftError(error)) {
+        if (process.env.NODE_ENV === "development") {
+          console.error(
+            "[db] Schema mismatch — run `pnpm db:deploy` then restart the dev server.",
+          );
+        }
+        throw error;
+      }
+
+      if (!isConnectionError(error) || attempt === attempts) {
+        throw error;
+      }
+
+      await invalidateDbConnection();
+      await sleep(250 * attempt);
+    }
+  }
+
+  throw lastError;
 }
 
 export const prisma = new Proxy({} as PrismaClient, {

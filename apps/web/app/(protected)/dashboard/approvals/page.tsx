@@ -1,13 +1,8 @@
-import Link from "next/link";
-
-import { Card, CardContent } from "@/components/ui/card";
-import { FeatureStatusBadge } from "@/features/shipflow/components/feature-status-badge";
-import {
-  ApprovalHistory,
-  ReleaseApprovalPanel,
-} from "@/features/shipflow/components/release-approval-panel";
+import { ApprovalsPageClient } from "@/features/dashboard/components/approvals-page-client";
 import { ensureWorkspaceAction } from "@/lib/actions/shipflow";
 import { prisma } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 
 export default async function ApprovalsPage() {
   const workspace = await ensureWorkspaceAction();
@@ -37,41 +32,17 @@ export default async function ApprovalsPage() {
         </p>
       </div>
 
-      {features.length === 0 ? (
-        <p className="text-sm text-muted-foreground">
-          No features awaiting release approval.
-        </p>
-      ) : (
-        features.map((feature) => (
-          <Card key={feature.id}>
-            <CardContent className="space-y-4 pt-6">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <Link
-                    href={`/dashboard/feature-requests/${feature.id}`}
-                    className="font-medium hover:underline"
-                  >
-                    {feature.title}
-                  </Link>
-                  <div className="mt-1">
-                    <FeatureStatusBadge status={feature.status} />
-                  </div>
-                </div>
-              </div>
-              <ReleaseApprovalPanel
-                featureRequestId={feature.id}
-                status={feature.status}
-              />
-              <ApprovalHistory
-                approvals={feature.approvals.map((approval) => ({
-                  ...approval,
-                  createdAt: new Date(approval.createdAt),
-                }))}
-              />
-            </CardContent>
-          </Card>
-        ))
-      )}
+      <ApprovalsPageClient
+        features={features.map((feature) => ({
+          id: feature.id,
+          title: feature.title,
+          status: feature.status,
+          approvals: feature.approvals.map((approval) => ({
+            ...approval,
+            createdAt: new Date(approval.createdAt),
+          })),
+        }))}
+      />
     </div>
   );
 }

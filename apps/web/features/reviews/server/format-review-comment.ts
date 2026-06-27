@@ -7,7 +7,14 @@ function formatFinding(
 ) {
   const label =
     finding.severity === "blocking" ? "🚫 Blocking" : "💡 Non-blocking";
-  const location = finding.filePath ? ` (\`${finding.filePath}\`)` : "";
+  const location = finding.filePath
+    ? ` (\`${finding.filePath}${finding.lineStart != null ? `:${finding.lineStart}` : ""}\`)`
+    : "";
+
+  const confidenceNote =
+    typeof finding.confidence === "number"
+      ? `**AI confidence:** ${finding.confidence}%`
+      : null;
 
   const sections = [
     `### ${index + 1}. ${label}: ${finding.title}${location}`,
@@ -15,6 +22,7 @@ function formatFinding(
     `**Category:** ${finding.category}`,
     "",
     finding.description,
+    ...(confidenceNote ? ["", confidenceNote] : []),
   ];
 
   if (finding.codeSuggestion) {

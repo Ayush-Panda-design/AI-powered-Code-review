@@ -12,6 +12,8 @@ import {
   Building2,
   FolderKanban,
   ShieldCheck,
+  Activity,
+  BarChart3,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -72,6 +74,18 @@ export const dashboardRoutes: DashboardRoute[] = [
     description: "AI review results across PRs",
   },
   {
+    title: "Review SLA",
+    href: `${DASHBOARD_BASE_PATH}/review-sla`,
+    icon: BarChart3,
+    description: "Time-to-first-review by repo",
+  },
+  {
+    title: "Activity",
+    href: `${DASHBOARD_BASE_PATH}/activity`,
+    icon: Activity,
+    description: "Org-wide workflow audit trail",
+  },
+  {
     title: "Release Approval",
     href: `${DASHBOARD_BASE_PATH}/approvals`,
     icon: ShieldCheck,
@@ -111,6 +125,7 @@ export const FEATURE_STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   clarifying: "Clarifying",
   prd_generating: "Generating PRD",
+  awaiting_prd_approval: "Awaiting PRD Approval",
   prd_ready: "PRD Ready",
   planning: "Planning",
   awaiting_plan_approval: "Awaiting Plan Approval",

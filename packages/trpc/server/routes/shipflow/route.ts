@@ -82,12 +82,50 @@ export const shipflowRouter = router({
   triggerTasks: protectedProcedure
     .input(z.object({ featureRequestId: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      await assertFeatureAccess(input.featureRequestId, ctx.userId);
+      const feature = await assertFeatureAccess(
+        input.featureRequestId,
+        ctx.userId,
+      );
+
+      if (!feature.prd || feature.prd.status !== "approved") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Approve the PRD before generating tasks.",
+        });
+      }
+
+      if (feature.status !== "prd_ready") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Feature must be in PRD Ready status to generate tasks.",
+        });
+      }
+
       await requireCreditsForFeature(
         input.featureRequestId,
         AI_CREDIT_COSTS.tasks,
       );
       await sendTasksJob(input.featureRequestId);
+      return { ok: true };
+    }),
+
+  approvePrd: protectedProcedure
+    .input(z.object({ featureRequestId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const feature = await assertFeatureAccess(
+        input.featureRequestId,
+        ctx.userId,
+      );
+
+      if (feature.status !== "awaiting_prd_approval") {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Feature is not awaiting PRD approval",
+        });
+      }
+
+      const { approvePrd } = await import("@repo/services");
+      await approvePrd(input.featureRequestId);
       return { ok: true };
     }),
 });

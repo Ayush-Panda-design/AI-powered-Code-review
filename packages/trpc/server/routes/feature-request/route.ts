@@ -3,7 +3,12 @@ import {
   addClarification,
   createFeatureRequest,
   getFeatureRequest,
+  getRequiredPlanApprovals,
+  linkPullRequestToFeature,
   listFeatureRequests,
+  listLinkablePullRequests,
+  listPlanApprovals,
+  unlinkPullRequestFromFeature,
   updateFeatureStatus,
 } from "@repo/services";
 import { prisma } from "@repo/database";
@@ -96,6 +101,99 @@ export const featureRequestRouter = router({
         input.featureRequestId,
         input.role,
         input.content,
+      );
+    }),
+
+  planApprovalStatus: protectedProcedure
+    .input(z.object({ featureRequestId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const feature = await getFeatureRequest(input.featureRequestId);
+      if (!feature) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      await assertProjectAccess(feature.projectId, ctx.userId);
+
+      const [approvals, required] = await Promise.all([
+        listPlanApprovals(input.featureRequestId),
+        getRequiredPlanApprovals(feature.project.workspaceId),
+      ]);
+
+      return {
+        approvals: approvals.map((approval) => ({
+          id: approval.id,
+          createdAt: approval.createdAt.toISOString(),
+          reviewer: approval.reviewer,
+        })),
+        required,
+        currentUserApproved: approvals.some(
+          (approval) => approval.reviewerId === ctx.userId,
+        ),
+      };
+    }),
+
+  linkPullRequest: protectedProcedure
+    .input(
+      z.object({
+        featureRequestId: z.string(),
+        pullRequestId: z.string(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const feature = await getFeatureRequest(input.featureRequestId);
+      if (!feature) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      await assertProjectAccess(feature.projectId, ctx.userId);
+
+      await linkPullRequestToFeature({
+        pullRequestId: input.pullRequestId,
+        featureRequestId: input.featureRequestId,
+        workspaceId: feature.project.workspaceId,
+      });
+
+      return { ok: true };
+    }),
+
+  unlinkPullRequest: protectedProcedure
+    .input(z.object({ pullRequestId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const pullRequest = await prisma.pullRequest.findFirst({
+        where: { id: input.pullRequestId },
+        include: { featureRequest: { include: { project: true } } },
+      });
+
+      if (!pullRequest?.featureRequest) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      await assertProjectAccess(
+        pullRequest.featureRequest.projectId,
+        ctx.userId,
+      );
+
+      await unlinkPullRequestFromFeature({
+        pullRequestId: input.pullRequestId,
+        workspaceId: pullRequest.featureRequest.project.workspaceId,
+      });
+
+      return { ok: true };
+    }),
+
+  listLinkablePullRequests: protectedProcedure
+    .input(z.object({ featureRequestId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const feature = await getFeatureRequest(input.featureRequestId);
+      if (!feature) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      await assertProjectAccess(feature.projectId, ctx.userId);
+
+      return listLinkablePullRequests(
+        feature.project.workspaceId,
+        input.featureRequestId,
       );
     }),
 });

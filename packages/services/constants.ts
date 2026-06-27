@@ -2,6 +2,7 @@ export const FEATURE_STATUSES = [
   "draft",
   "clarifying",
   "prd_generating",
+  "awaiting_prd_approval",
   "prd_ready",
   "planning",
   "awaiting_plan_approval",
@@ -26,6 +27,7 @@ export const AI_CREDIT_COSTS = {
   prd: 2,
   tasks: 2,
   review: 3,
+  codegen: 5,
 } as const;
 
 /** Free-plan quota. High in dev for localhost testing; set to 10 before production polish. */
@@ -44,7 +46,8 @@ export function getFreePlanAiCredits() {
 /** @deprecated use getFreePlanAiCredits() — evaluated at call time for correct env */
 export const FREE_PLAN_AI_CREDITS = getFreePlanAiCredits();
 
-export const FREE_PLAN_REPO_LIMIT = 2;
+/** Plan approvals required before development (capped by member count) */
+export const PLAN_APPROVALS_REQUIRED = 2;
 
 export type AiCreditAction = keyof typeof AI_CREDIT_COSTS;
 
@@ -59,6 +62,29 @@ export const IN_FLIGHT_FEATURE_STATUSES = [
 export function isInFlightFeatureStatus(status: string) {
   return (IN_FLIGHT_FEATURE_STATUSES as readonly string[]).includes(status);
 }
+
+export const IN_FLIGHT_PR_STATUSES = ["pending", "processing"] as const;
+
+export function isInFlightPrStatus(status: string) {
+  return (IN_FLIGHT_PR_STATUSES as readonly string[]).includes(status);
+}
+
+/** How long before a stuck "processing" PR can be re-queued */
+export function getStaleProcessingMs() {
+  return isDevCreditsMode() ? 2 * 60 * 1000 : 3 * 60 * 1000;
+}
+
+/** Max non-blocking findings posted per review (blocking always shown) */
+export const REVIEW_NON_BLOCKING_BUDGET = 8;
+
+/** PR size thresholds */
+export const PR_SIZE_WARN_FILES = 30;
+export const PR_SIZE_WARN_LINES = 2000;
+export const PR_SIZE_CRITICAL_FILES = 80;
+export const PR_SIZE_CRITICAL_LINES = 5000;
+
+/** Stale PR threshold (hours without update) */
+export const STALE_PR_HOURS = 48;
 
 export function slugify(value: string) {
   return value
