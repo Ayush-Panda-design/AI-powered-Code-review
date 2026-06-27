@@ -111,7 +111,9 @@ export function PrLinkPanel({
           <div className="flex flex-wrap gap-2">
             <Select
               value={selectedPrId}
-              onValueChange={setSelectedPrId}
+              onValueChange={(value) => {
+                if (value) setSelectedPrId(value);
+              }}
               disabled={isLoading || linkable.length === 0}
             >
               <SelectTrigger className="w-full max-w-md">
