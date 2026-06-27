@@ -18,8 +18,17 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { dashboardRoutes } from "@/features/dashboard/lib/routes";
+import { WorkspaceSwitcher } from "@/features/dashboard/components/workspace-switcher";
 
-export function DashboardSidebar() {
+type DashboardSidebarProps = {
+  workspaces: { id: string; name: string }[];
+  activeWorkspaceId: string;
+};
+
+export function DashboardSidebar({
+  workspaces,
+  activeWorkspaceId,
+}: DashboardSidebarProps) {
   const pathname = usePathname();
 
   return (
@@ -76,7 +85,12 @@ export function DashboardSidebar() {
         </SidebarGroup>
       </SidebarContent>
 
-      <SidebarFooter className="border-t border-sidebar-border" />
+      <SidebarFooter className="border-t border-sidebar-border p-2">
+        <WorkspaceSwitcher
+          workspaces={workspaces}
+          activeWorkspaceId={activeWorkspaceId}
+        />
+      </SidebarFooter>
       <SidebarRail />
     </Sidebar>
   );

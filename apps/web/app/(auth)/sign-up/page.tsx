@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { EmailSignInForm } from "@/components/auth/email-sign-in-form";
+import { EmailSignUpForm } from "@/components/auth/email-sign-up-form";
 import { GithubSignInForm } from "@/components/auth/github-sign-in-form";
 import {
   Card,
@@ -13,13 +13,13 @@ import { Separator } from "@/components/ui/separator";
 import { redirectIfAuthenticated } from "@/lib/auth-session";
 import { resolveCallbackUrl } from "@/lib/auth-proxy";
 
-type SignInPageProps = {
+type SignUpPageProps = {
   searchParams: Promise<{
     callbackUrl?: string;
   }>;
 };
 
-export default async function SignInPage({ searchParams }: SignInPageProps) {
+export default async function SignUpPage({ searchParams }: SignUpPageProps) {
   const { callbackUrl } = await searchParams;
   const safeCallbackUrl = resolveCallbackUrl(callbackUrl);
 
@@ -28,9 +28,9 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
   return (
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
-        <CardTitle>Sign in</CardTitle>
+        <CardTitle>Create account</CardTitle>
         <CardDescription>
-          Continue with GitHub or your email and password.
+          Sign up with GitHub or email to start using ShipFlow AI.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
@@ -40,15 +40,11 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
           <span className="text-xs text-muted-foreground">or</span>
           <Separator className="flex-1" />
         </div>
-        <EmailSignInForm />
+        <EmailSignUpForm />
         <p className="text-center text-sm text-muted-foreground">
-          No account?{" "}
-          <Link href="/sign-up" className="underline-offset-4 hover:underline">
-            Sign up
-          </Link>
-          {" · "}
-          <Link href="/" className="underline-offset-4 hover:underline">
-            Back to home
+          Already have an account?{" "}
+          <Link href="/sign-in" className="underline-offset-4 hover:underline">
+            Sign in
           </Link>
         </p>
       </CardContent>

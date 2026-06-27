@@ -50,7 +50,12 @@ export function getAuthTrustedOrigins() {
 }
 
 export function getAuthAllowedHosts() {
-  const hosts = new Set<string>();
+  const hosts = new Set<string>([
+    "localhost:*",
+    "127.0.0.1:*",
+    "[::1]:*",
+    "*.vercel.app",
+  ]);
 
   for (const origin of getAuthTrustedOrigins()) {
     const parsed = parseUrl(origin);

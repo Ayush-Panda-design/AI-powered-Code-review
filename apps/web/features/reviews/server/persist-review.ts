@@ -1,4 +1,5 @@
 import type { StructuredReview } from "@/features/reviews/types/structured-review";
+import { sendReleaseReadinessJob } from "@repo/services";
 import { prisma } from "@/lib/db";
 
 type PersistReviewInput = {
@@ -41,13 +42,17 @@ export async function persistReviewResult(input: PersistReviewInput) {
     }
 
     const nextStatus =
-      input.blockingCount > 0 ? "fix_needed" : "awaiting_approval";
+      input.blockingCount > 0 ? "fix_needed" : "release_checking";
 
     await tx.featureRequest.update({
       where: { id: input.featureRequestId },
       data: { status: nextStatus },
     });
   });
+
+  if (input.featureRequestId && input.blockingCount === 0) {
+    await sendReleaseReadinessJob(input.featureRequestId);
+  }
 }
 
 export async function markFeatureInReview(featureRequestId: string | null) {

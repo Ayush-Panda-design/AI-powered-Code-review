@@ -14,6 +14,8 @@ Classify every issue as:
 - blocking: must be fixed before merge (bugs, security holes, missing critical requirements)
 - non_blocking: improvements, style, minor gaps
 
+CRITICAL: Use blocking ONLY for real defects or security issues. Do NOT mark correct security improvements, intended behavior, or positive changes as blocking. Observations and praise belong in non_blocking or should be omitted.
+
 Be specific and reference file paths when possible.`;
 
 const PRD_AWARE_REVIEW_SYSTEM_PROMPT = `You are ShipFlow AI's PRD-aware code reviewer.
@@ -23,6 +25,8 @@ Your job is to verify that the pull request implements the linked feature's PRD,
 Classify every issue as:
 - blocking: violates acceptance criteria, misses required behavior, security/data bugs, or breaks core PRD goals
 - non_blocking: polish, refactors, minor deviations, or suggestions
+
+CRITICAL: Use blocking ONLY when the PR must not ship without a fix. Correct implementations, defense-in-depth checks, and acceptable trade-offs are NOT blocking. Never flag "correctly implements X" as blocking.
 
 Always assess PRD alignment explicitly in prdAlignment.`;
 
@@ -167,7 +171,7 @@ ${formatTaskContext(reviewContext)}
 **Relevant diff context (semantic search):**
 ${diffContext}
 
-Return structured findings. Use blocking only for issues that must be fixed before merge.`
+Return structured findings. Use blocking only for issues that must be fixed before merge. Never use blocking for observations about correct or improved code.`
     : `Review this pull request.
 
 **Title:** ${title}
@@ -175,7 +179,7 @@ Return structured findings. Use blocking only for issues that must be fixed befo
 **Relevant diff context (semantic search):**
 ${diffContext}
 
-Return structured findings. Use blocking only for correctness, security, or critical quality issues.`;
+Return structured findings. Use blocking only for correctness, security, or critical quality issues. Never use blocking for observations about correct or improved code.`;
 
   const { object } = await generateObject({
     model,

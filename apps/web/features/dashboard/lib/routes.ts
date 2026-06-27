@@ -1,12 +1,17 @@
 import {
   CreditCard,
+  FileText,
   GitPullRequest,
+  History,
   Kanban,
   LayoutDashboard,
   Lightbulb,
   FolderGit2,
   Settings,
   AppWindow,
+  Building2,
+  FolderKanban,
+  ShieldCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -28,10 +33,27 @@ export const dashboardRoutes: DashboardRoute[] = [
     description: "ShipFlow delivery pipeline at a glance",
   },
   {
+    title: "Workspaces",
+    href: `${DASHBOARD_BASE_PATH}/workspaces`,
+    icon: Building2,
+    description: "Manage workspaces and members",
+  },
+  {
+    title: "Projects",
+    href: `${DASHBOARD_BASE_PATH}/projects`,
+    icon: FolderKanban,
+  },
+  {
     title: "Feature Requests",
     href: `${DASHBOARD_BASE_PATH}/feature-requests`,
     icon: Lightbulb,
     description: "Request → PRD → Tasks → Ship",
+  },
+  {
+    title: "PRD Editor",
+    href: `${DASHBOARD_BASE_PATH}/prd`,
+    icon: FileText,
+    description: "View and edit generated PRDs",
   },
   {
     title: "Task Board",
@@ -42,6 +64,18 @@ export const dashboardRoutes: DashboardRoute[] = [
     title: "Pull Requests",
     href: `${DASHBOARD_BASE_PATH}/pull-requests`,
     icon: GitPullRequest,
+  },
+  {
+    title: "Review History",
+    href: `${DASHBOARD_BASE_PATH}/review-history`,
+    icon: History,
+    description: "AI review results across PRs",
+  },
+  {
+    title: "Release Approval",
+    href: `${DASHBOARD_BASE_PATH}/approvals`,
+    icon: ShieldCheck,
+    description: "Human gate for features ready to ship",
   },
   {
     title: "Repositories",
@@ -79,8 +113,10 @@ export const FEATURE_STATUS_LABELS: Record<string, string> = {
   prd_generating: "Generating PRD",
   prd_ready: "PRD Ready",
   planning: "Planning",
+  awaiting_plan_approval: "Awaiting Plan Approval",
   in_development: "In Development",
   in_review: "AI Review",
+  release_checking: "Release Readiness",
   fix_needed: "Fix Needed",
   awaiting_approval: "Awaiting Approval",
   shipped: "Shipped",

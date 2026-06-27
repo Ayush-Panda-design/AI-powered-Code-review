@@ -44,6 +44,24 @@ export async function signUpWithEmail(
   redirect(safeCallbackUrl);
 }
 
+export async function signInWithGithubAction(callbackUrl?: string) {
+  const safeCallbackUrl = resolveCallbackUrl(callbackUrl);
+
+  const result = await auth.api.signInSocial({
+    body: {
+      provider: "github",
+      callbackURL: safeCallbackUrl,
+    },
+    headers: await headers(),
+  });
+
+  if (result.url) {
+    redirect(result.url);
+  }
+
+  throw new Error("GitHub sign-in did not return an authorization URL");
+}
+
 export async function signOutAction() {
   await auth.api.signOut({
     headers: await headers(),

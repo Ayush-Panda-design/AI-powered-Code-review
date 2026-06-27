@@ -38,6 +38,12 @@ export async function getFeatureRequest(id: string) {
   });
 }
 
+function isLikelyDuplicateTitle(title: string, otherTitle: string) {
+  const normalized = title.trim().toLowerCase();
+  const other = otherTitle.trim().toLowerCase();
+  return normalized === other || normalized.includes(other) || other.includes(normalized);
+}
+
 export async function createFeatureRequest(input: {
   projectId: string;
   title: string;
@@ -45,6 +51,19 @@ export async function createFeatureRequest(input: {
   source?: string;
   createdById?: string;
 }) {
+  const existing = await prisma.featureRequest.findMany({
+    where: {
+      projectId: input.projectId,
+      status: { notIn: ["rejected", "duplicate", "shipped"] },
+    },
+    select: { title: true },
+    take: 50,
+  });
+
+  const isDuplicate = existing.some((feature) =>
+    isLikelyDuplicateTitle(input.title, feature.title),
+  );
+
   return prisma.featureRequest.create({
     data: {
       projectId: input.projectId,
@@ -52,7 +71,7 @@ export async function createFeatureRequest(input: {
       description: input.description,
       source: input.source ?? "manual",
       createdById: input.createdById,
-      status: "draft",
+      status: isDuplicate ? "duplicate" : "draft",
     },
   });
 }

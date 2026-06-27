@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
 import { AiReviewPanel } from "@/features/reviews/components/ai-review-panel";
 import { FeatureStatusBadge } from "@/features/shipflow/components/feature-status-badge";
 import {
@@ -19,6 +21,7 @@ import {
   getLowCreditsBannerMessage,
 } from "@/features/shipflow/lib/credit-hints";
 import { BILLING_PATH } from "@/features/dashboard/lib/routes";
+import { approvePlanAction } from "@/lib/actions/shipflow";
 import { AI_CREDIT_COSTS, isInFlightFeatureStatus } from "@repo/services/constants";
 import { trpc } from "@/trpc/client";
 
@@ -91,6 +94,17 @@ export function FeatureRequestDetailClient({
   const tasksMutation = trpc.shipflow.triggerTasks.useMutation(
     aiMutationHandlers("Generate tasks", AI_CREDIT_COSTS.tasks),
   );
+
+  const clarifyReplyMutation = trpc.featureRequest.addClarification.useMutation({
+    onSuccess: async () => {
+      toast.success("Reply saved");
+      await invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const [clarifyReply, setClarifyReply] = useState("");
+  const [isApprovingPlan, startPlanApproval] = useTransition();
 
   const creditAffordance = (cost: number) =>
     getCreditAffordance({ cost, credits, inFlight, billingHref });
@@ -207,6 +221,15 @@ export function FeatureRequestDetailClient({
 
       <WorkflowStatusCard status={feature.status} />
 
+      {feature.status === "duplicate" && (
+        <Card className="border-amber-500/40 bg-amber-500/5">
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            This request was flagged as a likely duplicate of an existing feature.
+            Review similar requests before proceeding.
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Request</CardTitle>
@@ -230,14 +253,84 @@ export function FeatureRequestDetailClient({
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
             ))}
+            {feature.status !== "duplicate" && (
+              <form
+                className="space-y-2 pt-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  if (!clarifyReply.trim()) return;
+                  clarifyReplyMutation.mutate({
+                    featureRequestId: featureId,
+                    content: clarifyReply.trim(),
+                    role: "user",
+                  });
+                  setClarifyReply("");
+                }}
+              >
+                <Textarea
+                  value={clarifyReply}
+                  onChange={(event) => setClarifyReply(event.target.value)}
+                  placeholder="Reply to clarification questions…"
+                  rows={3}
+                />
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={clarifyReplyMutation.isPending || !clarifyReply.trim()}
+                >
+                  {clarifyReplyMutation.isPending ? "Saving…" : "Send reply"}
+                </Button>
+              </form>
+            )}
+          </CardContent>
+        </Card>
+      )}
+
+      {feature.status === "awaiting_plan_approval" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Approve engineering plan</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Review the generated tasks below. Approve the plan to move into
+              development.
+            </p>
+            <Button
+              size="sm"
+              disabled={isApprovingPlan}
+              onClick={() => {
+                startPlanApproval(async () => {
+                  try {
+                    await approvePlanAction(featureId);
+                    toast.success("Plan approved — development can begin");
+                    await invalidate();
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Failed to approve plan",
+                    );
+                  }
+                });
+              }}
+            >
+              {isApprovingPlan ? "Approving…" : "Approve plan"}
+            </Button>
           </CardContent>
         </Card>
       )}
 
       {feature.prd && (
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-4">
             <CardTitle className="text-base">PRD</CardTitle>
+            <Link
+              href={`/dashboard/prd/${featureId}`}
+              className="text-sm text-muted-foreground hover:underline"
+            >
+              Open in PRD Editor →
+            </Link>
           </CardHeader>
           <CardContent className="prose prose-sm dark:prose-invert max-w-none">
             <pre className="whitespace-pre-wrap text-sm">

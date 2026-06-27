@@ -42,11 +42,16 @@ export default async function FeatureRequestsPage() {
 
     const ws = await ensureWorkspaceAction();
     const proj = await getOrCreateDefaultProject(ws.id);
+    const source = String(formData.get("source") ?? "manual") as
+      | "manual"
+      | "email"
+      | "ticket"
+      | "call";
     const feature = await createFeatureRequest({
       projectId: proj.id,
       title,
       description,
-      source: "manual",
+      source,
     });
 
     const { redirect } = await import("next/navigation");
@@ -82,6 +87,19 @@ export default async function FeatureRequestsPage() {
               className="min-h-24 rounded-md border bg-background px-3 py-2 text-sm"
               required
             />
+            <label className="grid gap-1 text-sm">
+              <span className="text-muted-foreground">Intake source</span>
+              <select
+                name="source"
+                className="rounded-md border bg-background px-3 py-2 text-sm"
+                defaultValue="manual"
+              >
+                <option value="manual">Manual form</option>
+                <option value="email">Email</option>
+                <option value="ticket">Support ticket</option>
+                <option value="call">Customer call</option>
+              </select>
+            </label>
             <Button type="submit" className="w-fit">
               <Plus className="mr-2 size-4" /> Create request
             </Button>
