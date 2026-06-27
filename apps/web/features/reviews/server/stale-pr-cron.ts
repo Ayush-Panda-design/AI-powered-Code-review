@@ -53,7 +53,7 @@ export const checkStalePullRequests = inngest.createFunction(
             workspaceId,
             type: "stale_pr_nudge",
             title: `Stale PR #${pullRequest.prNumber} needs attention`,
-            detail: `${pullRequest.title} — no activity since ${pullRequest.updatedAt.toISOString()}`,
+            detail: `${pullRequest.title} — no activity since ${new Date(pullRequest.updatedAt).toISOString()}`,
             metadata: JSON.stringify({
               pullRequestId: pullRequest.id,
               repoFullName: pullRequest.repoFullName,
