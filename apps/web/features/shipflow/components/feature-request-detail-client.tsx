@@ -10,10 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { AiReviewPanel } from "@/features/reviews/components/ai-review-panel";
 import { FeatureStatusBadge } from "@/features/shipflow/components/feature-status-badge";
+import { PrLinkPanel } from "@/features/shipflow/components/pr-link-panel";
 import {
   ApprovalHistory,
   ReleaseApprovalPanel,
 } from "@/features/shipflow/components/release-approval-panel";
+import { PrdDiffPanel } from "@/features/shipflow/components/prd-diff-panel";
 import { WorkflowStatusCard } from "@/features/shipflow/components/workflow-status-card";
 import {
   aiJobToastId,
@@ -21,7 +23,7 @@ import {
   getLowCreditsBannerMessage,
 } from "@/features/shipflow/lib/credit-hints";
 import { BILLING_PATH } from "@/features/dashboard/lib/routes";
-import { approvePlanAction } from "@/lib/actions/shipflow";
+import { approvePlanAction, approvePrdAction } from "@/lib/actions/shipflow";
 import { AI_CREDIT_COSTS, isInFlightFeatureStatus } from "@repo/services/constants";
 import { trpc } from "@/trpc/client";
 
@@ -38,10 +40,15 @@ export function FeatureRequestDetailClient({
   const { data: feature, isLoading, error } = trpc.featureRequest.get.useQuery(
     { id: featureId },
     {
-      refetchInterval: (query) =>
-        query.state.data && isInFlightFeatureStatus(query.state.data.status)
-          ? 3000
-          : false,
+      refetchInterval: (query) => {
+        const data = query.state.data;
+        if (!data) return false;
+        if (isInFlightFeatureStatus(data.status)) return 3000;
+        const prInFlight = data.pullRequests?.some(
+          (pr) => pr.status === "pending" || pr.status === "processing",
+        );
+        return prInFlight ? 3000 : false;
+      },
     },
   );
 
@@ -95,6 +102,19 @@ export function FeatureRequestDetailClient({
     aiMutationHandlers("Generate tasks", AI_CREDIT_COSTS.tasks),
   );
 
+  const approvePrdMutation = trpc.shipflow.approvePrd.useMutation({
+    onSuccess: async () => {
+      toast.success("PRD approved — you can now generate tasks");
+      await invalidate();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const { data: planApprovalStatus } = trpc.featureRequest.planApprovalStatus.useQuery(
+    { featureRequestId: featureId },
+    { enabled: feature?.status === "awaiting_plan_approval" },
+  );
+
   const clarifyReplyMutation = trpc.featureRequest.addClarification.useMutation({
     onSuccess: async () => {
       toast.success("Reply saved");
@@ -105,6 +125,10 @@ export function FeatureRequestDetailClient({
 
   const [clarifyReply, setClarifyReply] = useState("");
   const [isApprovingPlan, startPlanApproval] = useTransition();
+  const [isApprovingPrd, startPrdApproval] = useTransition();
+
+  const canGenerateTasks =
+    feature?.status === "prd_ready" && feature.prd?.status === "approved";
 
   const creditAffordance = (cost: number) =>
     getCreditAffordance({ cost, credits, inFlight, billingHref });
@@ -189,8 +213,12 @@ export function FeatureRequestDetailClient({
           <Button
             variant="outline"
             size="sm"
-            disabled={inFlight || tasksMutation.isPending}
-            title={creditAffordance(AI_CREDIT_COSTS.tasks).hint}
+            disabled={inFlight || tasksMutation.isPending || !canGenerateTasks}
+            title={
+              canGenerateTasks
+                ? creditAffordance(AI_CREDIT_COSTS.tasks).hint
+                : "Approve the PRD before generating tasks"
+            }
             onClick={() => {
               const { canAfford, hint } = creditAffordance(AI_CREDIT_COSTS.tasks);
               if (!canAfford) {
@@ -220,6 +248,15 @@ export function FeatureRequestDetailClient({
       ) : null}
 
       <WorkflowStatusCard status={feature.status} />
+
+      {feature.status === "rejected" && (
+        <Card className="border-destructive/40 bg-destructive/5">
+          <CardContent className="pt-6 text-sm text-muted-foreground">
+            This feature was rejected at the human release gate and will not ship.
+            Review the approval audit trail below for reviewer notes.
+          </CardContent>
+        </Card>
+      )}
 
       {feature.status === "duplicate" && (
         <Card className="border-amber-500/40 bg-amber-500/5">
@@ -286,6 +323,43 @@ export function FeatureRequestDetailClient({
         </Card>
       )}
 
+      {feature.status === "awaiting_prd_approval" && feature.prd && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Approve PRD</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Review the generated PRD below. Approve it before breaking work into
+              engineering tasks.
+            </p>
+            <Button
+              size="sm"
+              disabled={isApprovingPrd || approvePrdMutation.isPending}
+              onClick={() => {
+                startPrdApproval(async () => {
+                  try {
+                    await approvePrdAction(featureId);
+                    toast.success("PRD approved");
+                    await invalidate();
+                  } catch (error) {
+                    toast.error(
+                      error instanceof Error
+                        ? error.message
+                        : "Failed to approve PRD",
+                    );
+                  }
+                });
+              }}
+            >
+              {isApprovingPrd || approvePrdMutation.isPending
+                ? "Approving…"
+                : "Approve PRD"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {feature.status === "awaiting_plan_approval" && (
         <Card>
           <CardHeader>
@@ -293,17 +367,37 @@ export function FeatureRequestDetailClient({
           </CardHeader>
           <CardContent className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Review the generated tasks below. Approve the plan to move into
-              development.
+              Team review required before development.{" "}
+              {planApprovalStatus
+                ? `${planApprovalStatus.approvals.length} of ${planApprovalStatus.required} approval(s) recorded.`
+                : "Loading approval status…"}
             </p>
+            {planApprovalStatus && planApprovalStatus.approvals.length > 0 && (
+              <ul className="space-y-1 text-sm">
+                {planApprovalStatus.approvals.map((approval) => (
+                  <li key={approval.id} className="text-muted-foreground">
+                    ✓ {approval.reviewer.name} ({approval.reviewer.email})
+                  </li>
+                ))}
+              </ul>
+            )}
             <Button
               size="sm"
-              disabled={isApprovingPlan}
+              disabled={
+                isApprovingPlan ||
+                planApprovalStatus?.currentUserApproved === true
+              }
               onClick={() => {
                 startPlanApproval(async () => {
                   try {
-                    await approvePlanAction(featureId);
-                    toast.success("Plan approved — development can begin");
+                    const result = await approvePlanAction(featureId);
+                    if (result.complete) {
+                      toast.success("Plan fully approved — development can begin");
+                    } else {
+                      toast.success(
+                        `Your approval recorded (${result.approvalCount}/${result.required})`,
+                      );
+                    }
                     await invalidate();
                   } catch (error) {
                     toast.error(
@@ -315,7 +409,11 @@ export function FeatureRequestDetailClient({
                 });
               }}
             >
-              {isApprovingPlan ? "Approving…" : "Approve plan"}
+              {planApprovalStatus?.currentUserApproved
+                ? "You approved"
+                : isApprovingPlan
+                  ? "Approving…"
+                  : "Approve plan"}
             </Button>
           </CardContent>
         </Card>
@@ -325,6 +423,13 @@ export function FeatureRequestDetailClient({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-4">
             <CardTitle className="text-base">PRD</CardTitle>
+            <div className="flex items-center gap-2">
+              {feature.prd.status === "approved" ? (
+                <span className="text-xs text-emerald-600">Approved</span>
+              ) : (
+                <span className="text-xs text-amber-600">Draft — awaiting approval</span>
+              )}
+            </div>
             <Link
               href={`/dashboard/prd/${featureId}`}
               className="text-sm text-muted-foreground hover:underline"
@@ -332,7 +437,23 @@ export function FeatureRequestDetailClient({
               Open in PRD Editor →
             </Link>
           </CardHeader>
-          <CardContent className="prose prose-sm dark:prose-invert max-w-none">
+          <CardContent className="space-y-4">
+            <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
+              <p className="mb-1 font-medium text-foreground">Why this PRD</p>
+              <p>
+                Built from request: <strong>{feature.title}</strong>
+              </p>
+              {feature.clarifications.length > 0 ? (
+                <p className="mt-1">
+                  Informed by {feature.clarifications.length} clarification
+                  message(s) above.
+                </p>
+              ) : null}
+            </div>
+            <PrdDiffPanel
+              aiDraftMarkdown={feature.prd.aiDraftMarkdown}
+              currentMarkdown={feature.prd.rawMarkdown}
+            />
             <pre className="whitespace-pre-wrap text-sm">
               {feature.prd.rawMarkdown}
             </pre>
@@ -359,28 +480,11 @@ export function FeatureRequestDetailClient({
         </Card>
       )}
 
-      {feature.pullRequests.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Linked pull requests</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {feature.pullRequests.map((pr) => (
-              <div key={pr.id} className="flex justify-between text-sm">
-                <span>
-                  {pr.repoFullName} #{pr.prNumber} — {pr.title}
-                </span>
-                <span className="capitalize">{pr.status}</span>
-              </div>
-            ))}
-            <p className="pt-2 text-xs text-muted-foreground">
-              Link PRs automatically with branch names like{" "}
-              <code>feature/&lt;feature-id&gt;</code> or PR title{" "}
-              <code>[shipflow:&lt;feature-id&gt;]</code>.
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <PrLinkPanel
+        featureRequestId={featureId}
+        linkedPullRequests={feature.pullRequests}
+        onUpdated={invalidate}
+      />
 
       <AiReviewPanel
         reviews={feature.aiReviews.map((review) => ({

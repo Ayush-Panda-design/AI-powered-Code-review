@@ -4,9 +4,11 @@ import { useState } from "react";
 
 import type { ReviewFinding } from "@/features/reviews/types/structured-review";
 import { ReviewDiffPanel } from "@/features/reviews/components/review-diff-panel";
+import { FindingFeedback } from "@/features/reviews/components/finding-feedback";
 import {
   confidenceLabel,
   parseFindings,
+  sortFindingsByConfidence,
 } from "@/features/reviews/types/structured-review";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -70,7 +72,7 @@ export function AiReviewPanel({ reviews }: { reviews: AiReviewRecord[] }) {
 
   const selected =
     reviews.find((review) => review.id === selectedId) ?? reviews[0]!;
-  const findings = parseFindings(selected.findings);
+  const findings = sortFindingsByConfidence(parseFindings(selected.findings));
 
   return (
     <Card>
@@ -148,9 +150,17 @@ export function AiReviewPanel({ reviews }: { reviews: AiReviewRecord[] }) {
                 <div className="mb-2 flex flex-wrap items-center gap-2">
                   <FindingBadge severity={finding.severity} />
                   <span className="font-medium">{finding.title}</span>
+                  {typeof finding.confidence === "number" && (
+                    <Badge variant="outline" className="text-xs">
+                      {finding.confidence}% sure
+                    </Badge>
+                  )}
                   {finding.filePath && (
                     <span className="text-xs text-muted-foreground">
                       {finding.filePath}
+                      {finding.lineStart != null
+                        ? `:${finding.lineStart}${finding.lineEnd != null && finding.lineEnd !== finding.lineStart ? `-${finding.lineEnd}` : ""}`
+                        : ""}
                     </span>
                   )}
                 </div>
@@ -166,6 +176,7 @@ export function AiReviewPanel({ reviews }: { reviews: AiReviewRecord[] }) {
                     </pre>
                   </div>
                 )}
+                <FindingFeedback reviewId={selected.id} finding={finding} />
               </div>
             ))}
           </div>

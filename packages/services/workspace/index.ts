@@ -1,15 +1,17 @@
-import { prisma } from "@repo/database";
+import { prisma, withDbRetry } from "@repo/database";
 import { getFreePlanAiCredits, isDevCreditsMode, slugify } from "../constants";
 
 export async function listWorkspacesForUser(userId: string) {
-  return prisma.workspace.findMany({
-    where: { members: { some: { userId } } },
-    include: {
-      members: { where: { userId }, take: 1 },
-      _count: { select: { projects: true } },
-    },
-    orderBy: { createdAt: "asc" },
-  });
+  return withDbRetry(() =>
+    prisma.workspace.findMany({
+      where: { members: { some: { userId } } },
+      include: {
+        members: { where: { userId }, take: 1 },
+        _count: { select: { projects: true } },
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+  );
 }
 
 export async function getWorkspaceForUser(workspaceId: string, userId: string) {

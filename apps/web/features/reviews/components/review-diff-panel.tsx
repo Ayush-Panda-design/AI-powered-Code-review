@@ -44,12 +44,12 @@ function FindingList({
 }
 
 export function ReviewDiffPanel({ reviews }: { reviews: ReviewSnapshot[] }) {
+  const [olderId, setOlderId] = useState(reviews[1]?.id ?? reviews[0]?.id ?? "");
+  const [newerId, setNewerId] = useState(reviews[0]?.id ?? "");
+
   if (reviews.length < 2) {
     return null;
   }
-
-  const [olderId, setOlderId] = useState(reviews[1]?.id ?? "");
-  const [newerId, setNewerId] = useState(reviews[0]?.id ?? "");
 
   const older = reviews.find((review) => review.id === olderId) ?? reviews[1]!;
   const newer = reviews.find((review) => review.id === newerId) ?? reviews[0]!;

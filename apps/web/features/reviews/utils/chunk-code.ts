@@ -1,6 +1,8 @@
 export type PrFilePatch = {
   filename: string;
   patch: string;
+  additions?: number;
+  deletions?: number;
 };
 
 export type CodeChunk = {

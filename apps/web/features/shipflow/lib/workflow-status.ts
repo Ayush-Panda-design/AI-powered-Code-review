@@ -4,6 +4,8 @@ export function describeWorkflowStatus(status: string) {
       return "AI is generating clarification questions for this request.";
     case "prd_generating":
       return "AI is writing the PRD from your feature request.";
+    case "awaiting_prd_approval":
+      return "PRD draft is ready. A team member must approve the PRD before task generation.";
     case "planning":
       return "AI is breaking the PRD into engineering tasks.";
     case "fix_needed":
@@ -20,6 +22,8 @@ export function describeWorkflowStatus(status: string) {
       return "No blocking issues. A human can approve or reject release.";
     case "duplicate":
       return "This request looks similar to an existing feature and was marked as a duplicate.";
+    case "rejected":
+      return "A human reviewer rejected this feature at the release gate. It will not ship.";
     default:
       return null;
   }

@@ -1,4 +1,4 @@
-import { generateObject, jsonSchema } from "ai";
+import { generateObject, generateText, jsonSchema } from "ai";
 
 import { getReviewModel, getReviewMaxOutputTokens } from "@/features/ai-sdk";
 import type { RetrievedChunk } from "@/features/reviews/server/vectors";
@@ -11,45 +11,29 @@ import {
   countFindings,
 } from "@/features/reviews/types/structured-review";
 
-const ACTIONABLE_RULES = `For every finding that implies a code change, include codeSuggestion: a specific, copy-pasteable fix (snippet, function body, or diff-style replacement). Never say only "consider refactoring" — show exactly what to change.
-
-- blocking: codeSuggestion is REQUIRED on every finding.
-- non_blocking: codeSuggestion is REQUIRED whenever a concrete improvement can be shown; omit only for purely informational notes with no applicable code change.`;
-
 const GENERIC_REVIEW_SYSTEM_PROMPT = `You are an expert code reviewer. Review pull request changes for correctness, security, performance, and maintainability.
 
 Classify every issue as:
 - blocking: must be fixed before merge (bugs, security holes, missing critical requirements)
 - non_blocking: improvements, style, minor gaps
 
-CRITICAL: Use blocking ONLY for real defects or security issues. Do NOT mark correct security improvements, intended behavior, or positive changes as blocking.
+CRITICAL: Use blocking ONLY for real defects or security issues.
 
-${ACTIONABLE_RULES}
+Put concrete fix guidance in the description field (1-2 sentences). Do NOT use separate code blocks.
 
-Also set confidenceScore (0-100): how close this PR is to passing review (100 = ship-ready, 0 = major rework needed).
-
-Be specific and reference file paths when possible.`;
+Set confidenceScore (0-100) for the overall PR and confidence (0-100) on EACH finding.
+Include filePath when citing code. Limit to at most 8 findings — prioritize blocking issues.`;
 
 const PRD_AWARE_REVIEW_SYSTEM_PROMPT = `You are ShipFlow AI's PRD-aware code reviewer.
 
-Your job is to verify that the pull request implements the linked feature's PRD, acceptance criteria, and engineering tasks.
+Verify the pull request against the linked PRD, acceptance criteria, and engineering tasks.
 
-Classify every issue as:
-- blocking: violates acceptance criteria, misses required behavior, security/data bugs, or breaks core PRD goals
-- non_blocking: polish, refactors, minor deviations, or suggestions
+Classify issues as blocking or non_blocking. Use blocking ONLY when the PR must not ship without a fix.
 
-CRITICAL: Use blocking ONLY when the PR must not ship without a fix. Correct implementations, defense-in-depth checks, and acceptable trade-offs are NOT blocking.
+Put fix guidance in description (brief, plain text). Set confidenceScore and per-finding confidence (0-100).
+Include filePath when citing code. Max 8 findings. Always assess PRD alignment in prdAlignment.`;
 
-${ACTIONABLE_RULES}
-
-Set confidenceScore (0-100) from PRD alignment + severity of remaining issues.
-
-Always assess PRD alignment explicitly in prdAlignment.`;
-
-const MAX_CHUNK_CHARS = 2_000;
-const MAX_TOTAL_CONTEXT_CHARS = 12_000;
-const MAX_PRD_CHARS = 4_000;
-const MAX_TASKS = 12;
+const MAX_FINDINGS = 8;
 
 const reviewOutputSchema = jsonSchema<StructuredReview>({
   type: "object",
@@ -59,6 +43,7 @@ const reviewOutputSchema = jsonSchema<StructuredReview>({
     confidenceScore: { type: "number" },
     findings: {
       type: "array",
+      maxItems: MAX_FINDINGS,
       items: {
         type: "object",
         properties: {
@@ -68,7 +53,7 @@ const reviewOutputSchema = jsonSchema<StructuredReview>({
           title: { type: "string" },
           description: { type: "string" },
           filePath: { type: "string" },
-          codeSuggestion: { type: "string" },
+          confidence: { type: "number" },
         },
         required: ["id", "severity", "category", "title", "description"],
         additionalProperties: false,
@@ -79,12 +64,16 @@ const reviewOutputSchema = jsonSchema<StructuredReview>({
   additionalProperties: false,
 });
 
+const MAX_CHUNK_CHARS = 2_000;
+const MAX_TOTAL_CONTEXT_CHARS = 12_000;
+const MAX_PRD_CHARS = 4_000;
+const MAX_TASKS = 12;
+
 function truncateText(text: string, maxChars: number) {
   if (text.length <= maxChars) {
     return text;
   }
-
-  return `${text.slice(0, maxChars)}\n... [truncated]`;
+  return `${text.slice(0, maxChars)}...`;
 }
 
 function formatContext(chunks: RetrievedChunk[]) {
@@ -100,9 +89,7 @@ function formatContext(chunks: RetrievedChunk[]) {
     const section = `### Context ${index + 1}: ${chunk.filePath}\n\`\`\`diff\n${body}\n\`\`\``;
 
     if (totalChars + section.length > MAX_TOTAL_CONTEXT_CHARS) {
-      sections.push(
-        `_Additional diff context omitted to stay within model limits._`,
-      );
+      sections.push("_Additional diff context omitted._");
       break;
     }
 
@@ -122,10 +109,7 @@ function formatPrdContext(context: ReviewContext) {
     `Feature: ${context.featureTitle ?? "Unknown"}`,
     `Problem: ${context.prd.problemStatement}`,
     `Goals: ${context.prd.goals}`,
-    `Non-goals: ${context.prd.nonGoals}`,
-    `User stories: ${context.prd.userStories}`,
     `Acceptance criteria: ${context.prd.acceptanceCriteria}`,
-    `Edge cases: ${context.prd.edgeCases}`,
   ];
 
   return truncateText(sections.join("\n\n"), MAX_PRD_CHARS);
@@ -138,80 +122,121 @@ function formatTaskContext(context: ReviewContext) {
 
   return context.tasks
     .slice(0, MAX_TASKS)
-    .map(
-      (task, index) =>
-        `${index + 1}. [${task.status}] ${task.title}${
-          task.description ? ` — ${task.description}` : ""
-        }`,
-    )
+    .map((task, index) => `${index + 1}. [${task.status}] ${task.title}`)
     .join("\n");
 }
 
 function normalizeReview(review: StructuredReview): StructuredReview {
-  const findings: StructuredReview["findings"] = review.findings.map(
-    (finding, index) => ({
+  const findings: StructuredReview["findings"] = review.findings
+    .slice(0, MAX_FINDINGS)
+    .map((finding, index) => ({
       ...finding,
       id: finding.id || `finding-${index + 1}`,
       severity:
         finding.severity === "blocking"
           ? ("blocking" as const)
           : ("non_blocking" as const),
-      codeSuggestion: finding.codeSuggestion?.trim() || undefined,
-    }),
-  );
+      title: truncateText(finding.title, 200),
+      description: truncateText(finding.description, 500),
+      filePath: finding.filePath?.slice(0, 300),
+      confidence:
+        typeof finding.confidence === "number" && Number.isFinite(finding.confidence)
+          ? Math.max(0, Math.min(100, Math.round(finding.confidence)))
+          : undefined,
+    }));
 
   return {
-    summary: review.summary.trim(),
-    prdAlignment: review.prdAlignment.trim(),
+    summary: truncateText(review.summary.trim(), 1500),
+    prdAlignment: truncateText(review.prdAlignment.trim(), 1000),
     findings,
     confidenceScore: review.confidenceScore,
   };
+}
+
+async function generateReviewObject(
+  model: ReturnType<typeof getReviewModel>,
+  system: string,
+  prompt: string,
+) {
+  const { object } = await generateObject({
+    model,
+    maxOutputTokens: getReviewMaxOutputTokens(),
+    schema: reviewOutputSchema,
+    system,
+    prompt,
+  });
+
+  return normalizeReview(object);
+}
+
+async function generateReviewTextFallback(
+  model: ReturnType<typeof getReviewModel>,
+  system: string,
+  prompt: string,
+  isPrdAware: boolean,
+) {
+  const { text } = await generateText({
+    model,
+    maxOutputTokens: getReviewMaxOutputTokens(),
+    system: `${system}\n\nRespond with a concise review summary only.`,
+    prompt,
+  });
+
+  return normalizeReview({
+    summary: text.trim() || "Review completed with summary-only fallback.",
+    prdAlignment: isPrdAware
+      ? "Automated fallback review — re-run for structured PRD alignment."
+      : "No PRD linked.",
+    findings: [],
+    confidenceScore: 70,
+  });
 }
 
 export async function generateReview(
   title: string,
   contextChunks: RetrievedChunk[],
   reviewContext: ReviewContext,
+  options?: {
+    suppressedPatterns?: string[];
+    mutedCategories?: string[];
+  },
 ) {
   const model = getReviewModel();
   const diffContext = formatContext(contextChunks);
   const isPrdAware = Boolean(reviewContext.featureRequestId && reviewContext.prd);
 
+  const suppressionNote =
+    options?.suppressedPatterns?.length || options?.mutedCategories?.length
+      ? `\n\nSkip findings matching: ${[
+          ...(options.mutedCategories ?? []),
+          ...(options.suppressedPatterns ?? []),
+        ].join(", ")}`
+      : "";
+
   const prompt = isPrdAware
-    ? `Review this pull request against the linked feature's PRD and engineering tasks.
+    ? `Review PR "${title}" against PRD and tasks.\n\nPRD:\n${formatPrdContext(reviewContext)}\n\nTasks:\n${formatTaskContext(reviewContext)}\n\nDiff:\n${diffContext}${suppressionNote}`
+    : `Review PR "${title}".\n\nDiff:\n${diffContext}${suppressionNote}`;
 
-**Pull request title:** ${title}
+  const system = isPrdAware
+    ? PRD_AWARE_REVIEW_SYSTEM_PROMPT
+    : GENERIC_REVIEW_SYSTEM_PROMPT;
 
-**PRD context:**
-${formatPrdContext(reviewContext)}
+  try {
+    return await generateReviewObject(model, system, prompt);
+  } catch (firstError) {
+    console.warn("[generate-review] primary structured output failed:", firstError);
 
-**Engineering tasks:**
-${formatTaskContext(reviewContext)}
-
-**Relevant diff context (semantic search):**
-${diffContext}
-
-Return structured findings. Include codeSuggestion on every blocking issue and on non_blocking issues whenever a concrete code fix applies. Set confidenceScore 0-100.`
-    : `Review this pull request.
-
-**Title:** ${title}
-
-**Relevant diff context (semantic search):**
-${diffContext}
-
-Return structured findings. Include codeSuggestion on every blocking issue and on non_blocking issues whenever a concrete code fix applies. Set confidenceScore 0-100.`;
-
-  const { object } = await generateObject({
-    model,
-    maxOutputTokens: getReviewMaxOutputTokens(),
-    schema: reviewOutputSchema,
-    system: isPrdAware
-      ? PRD_AWARE_REVIEW_SYSTEM_PROMPT
-      : GENERIC_REVIEW_SYSTEM_PROMPT,
-    prompt,
-  });
-
-  return normalizeReview(object);
+    try {
+      return await generateReviewObject(
+        model,
+        `${system}\n\nSTRICT: Valid JSON only. Max 5 findings. Every string under 150 characters.`,
+        prompt,
+      );
+    } catch (secondError) {
+      console.warn("[generate-review] retry failed, using text fallback:", secondError);
+      return generateReviewTextFallback(model, system, prompt, isPrdAware);
+    }
+  }
 }
 
 export function enrichReview(review: StructuredReview) {

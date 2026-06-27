@@ -12,16 +12,37 @@ export type PrdPayload = {
 };
 
 export async function upsertPrd(featureRequestId: string, data: PrdPayload) {
+  const existing = await prisma.pRD.findUnique({
+    where: { featureRequestId },
+    select: { aiDraftMarkdown: true },
+  });
+
   return prisma.pRD.upsert({
     where: { featureRequestId },
-    create: { featureRequestId, ...data, status: "draft" },
-    update: { ...data, updatedAt: new Date() },
+    create: {
+      featureRequestId,
+      ...data,
+      aiDraftMarkdown: data.rawMarkdown,
+      status: "draft",
+    },
+    update: {
+      ...data,
+      aiDraftMarkdown: existing?.aiDraftMarkdown ?? data.rawMarkdown,
+      updatedAt: new Date(),
+    },
   });
 }
 
 export async function approvePrd(featureRequestId: string) {
-  return prisma.pRD.update({
+  const prd = await prisma.pRD.update({
     where: { featureRequestId },
     data: { status: "approved" },
   });
+
+  await prisma.featureRequest.update({
+    where: { id: featureRequestId },
+    data: { status: "prd_ready" },
+  });
+
+  return prd;
 }

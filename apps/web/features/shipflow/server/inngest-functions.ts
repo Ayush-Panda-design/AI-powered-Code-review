@@ -85,7 +85,7 @@ export const generatePrd = inngest.createFunction(
     );
 
     await upsertPrd(featureRequestId, prd);
-    await updateFeatureStatus(featureRequestId, "prd_ready");
+    await updateFeatureStatus(featureRequestId, "awaiting_prd_approval");
 
     return { ok: true };
   },

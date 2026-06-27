@@ -2,9 +2,13 @@ import { z } from "zod";
 import {
   AI_CREDIT_COSTS,
   assertHasCredits,
+  listPullRequestsForInstallation,
+  parseReviewFindings,
+  recordFindingFeedback,
   resolveWorkspaceIdForInstallation,
   sendReviewJob,
 } from "@repo/services";
+import { isInFlightPrStatus } from "@repo/services/constants";
 import { TRPCError } from "@trpc/server";
 import { prisma } from "@repo/database";
 
@@ -14,6 +18,177 @@ import { protectedProcedure, router } from "../../trpc";
 const STALE_PROCESSING_MS = 5 * 60 * 1000;
 
 export const reviewRouter = router({
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const installation = await prisma.gitHubInstallation.findUnique({
+      where: { userId: ctx.userId },
+    });
+
+    if (!installation) {
+      return { pullRequests: [], accountLogin: null as string | null };
+    }
+
+    const pullRequests = await listPullRequestsForInstallation(
+      installation.installationId,
+    );
+
+    return {
+      accountLogin: installation.accountLogin,
+      pullRequests: pullRequests.map((pullRequest) => ({
+        ...pullRequest,
+        updatedAt: pullRequest.updatedAt.toISOString(),
+        reviewedAt: pullRequest.reviewedAt?.toISOString() ?? null,
+        createdAt: pullRequest.createdAt.toISOString(),
+      })),
+    };
+  }),
+
+  history: protectedProcedure.query(async ({ ctx }) => {
+    const installation = await prisma.gitHubInstallation.findUnique({
+      where: { userId: ctx.userId },
+    });
+
+    if (!installation) {
+      return { connected: false as const, reviews: [] };
+    }
+
+    const reviews = await prisma.aIReview.findMany({
+      where: { pullRequest: { installationId: installation.installationId } },
+      include: {
+        pullRequest: {
+          select: {
+            repoFullName: true,
+            prNumber: true,
+            title: true,
+            status: true,
+          },
+        },
+        featureRequest: { select: { id: true, title: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    });
+
+    return {
+      connected: true as const,
+      reviews: reviews.map((review) => ({
+        id: review.id,
+        summary: review.summary,
+        blockingCount: review.blockingCount,
+        nonBlockingCount: review.nonBlockingCount,
+        confidenceScore: review.confidenceScore,
+        createdAt: review.createdAt.toISOString(),
+        pullRequest: review.pullRequest,
+        featureRequest: review.featureRequest,
+      })),
+    };
+  }),
+
+  getStatus: protectedProcedure
+    .input(z.object({ pullRequestId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const installation = await prisma.gitHubInstallation.findUnique({
+        where: { userId: ctx.userId },
+      });
+
+      if (!installation) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const pullRequest = await prisma.pullRequest.findFirst({
+        where: {
+          id: input.pullRequestId,
+          installationId: installation.installationId,
+        },
+        include: {
+          aiReviews: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: {
+              id: true,
+              blockingCount: true,
+              nonBlockingCount: true,
+              confidenceScore: true,
+              summary: true,
+              prdAlignment: true,
+            },
+          },
+        },
+      });
+
+      if (!pullRequest) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      return {
+        id: pullRequest.id,
+        status: pullRequest.status,
+        updatedAt: pullRequest.updatedAt.toISOString(),
+        sizeWarning: pullRequest.sizeWarning,
+        filesChanged: pullRequest.filesChanged,
+        linesChanged: pullRequest.linesChanged,
+        source: pullRequest.source,
+        latestReview: pullRequest.aiReviews[0] ?? null,
+      };
+    }),
+
+  submitFindingFeedback: protectedProcedure
+    .input(
+      z.object({
+        reviewId: z.string(),
+        findingId: z.string(),
+        feedback: z.enum(["helpful", "false_positive"]),
+        reason: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const installation = await prisma.gitHubInstallation.findUnique({
+        where: { userId: ctx.userId },
+      });
+
+      if (!installation) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const review = await prisma.aIReview.findFirst({
+        where: {
+          id: input.reviewId,
+          pullRequest: { installationId: installation.installationId },
+        },
+        include: {
+          pullRequest: { select: { repoFullName: true, installationId: true } },
+        },
+      });
+
+      if (!review) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const workspaceId = await resolveWorkspaceIdForInstallation(
+        review.pullRequest.installationId,
+      );
+
+      if (!workspaceId) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Workspace not found" });
+      }
+
+      const findings = parseReviewFindings(review.findings);
+      const finding = findings.find((item) => item.id === input.findingId);
+
+      if (!finding) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Finding not found" });
+      }
+
+      return recordFindingFeedback({
+        workspaceId,
+        reviewId: input.reviewId,
+        findingId: input.findingId,
+        feedback: input.feedback,
+        reason: input.reason,
+        repoFullName: review.pullRequest.repoFullName,
+        finding,
+      });
+    }),
+
   runReview: protectedProcedure
     .input(z.object({ pullRequestId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -47,8 +222,7 @@ export const reviewRouter = router({
         if (elapsedMs < STALE_PROCESSING_MS) {
           throw new TRPCError({
             code: "CONFLICT",
-            message:
-              "Review already in progress. Wait a minute, then refresh the page.",
+            message: "Review already in progress.",
           });
         }
       }
@@ -88,7 +262,68 @@ export const reviewRouter = router({
 
       return {
         ok: true,
-        message: "Review queued. Status will update in ~30–60 seconds.",
+        pullRequestId: pullRequest.id,
+        status: "pending" as const,
+        message: "Review queued — status updates automatically.",
       };
     }),
+
+  reviewSlaMetrics: protectedProcedure.query(async ({ ctx }) => {
+    const installation = await prisma.gitHubInstallation.findUnique({
+      where: { userId: ctx.userId },
+    });
+
+    if (!installation) {
+      return { metrics: [] };
+    }
+
+    const pullRequests = await prisma.pullRequest.findMany({
+      where: { installationId: installation.installationId },
+      select: {
+        repoFullName: true,
+        prNumber: true,
+        createdAt: true,
+        reviewedAt: true,
+        updatedAt: true,
+        status: true,
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+    });
+
+    const byRepo = new Map<
+      string,
+      { count: number; totalHoursToReview: number; reviewed: number }
+    >();
+
+    for (const pullRequest of pullRequests) {
+      const bucket = byRepo.get(pullRequest.repoFullName) ?? {
+        count: 0,
+        totalHoursToReview: 0,
+        reviewed: 0,
+      };
+      bucket.count += 1;
+      if (pullRequest.reviewedAt) {
+        const hours =
+          (pullRequest.reviewedAt.getTime() - pullRequest.createdAt.getTime()) /
+          (1000 * 60 * 60);
+        bucket.totalHoursToReview += hours;
+        bucket.reviewed += 1;
+      }
+      byRepo.set(pullRequest.repoFullName, bucket);
+    }
+
+    const metrics = [...byRepo.entries()].map(([repo, stats]) => ({
+      repo,
+      prCount: stats.count,
+      avgHoursToFirstReview:
+        stats.reviewed > 0
+          ? Math.round((stats.totalHoursToReview / stats.reviewed) * 10) / 10
+          : null,
+    }));
+
+    return { metrics };
+  }),
 });
+
+export { isInFlightPrStatus };

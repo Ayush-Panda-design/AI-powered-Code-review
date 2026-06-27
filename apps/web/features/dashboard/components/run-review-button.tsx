@@ -21,7 +21,12 @@ export function RunReviewButton({
   const runReview = trpc.review.runReview.useMutation({
     onSuccess: async (result) => {
       toast.success(result.message);
-      await utils.featureRequest.get.invalidate();
+      await Promise.all([
+        utils.review.list.invalidate(),
+        utils.review.history.invalidate(),
+        utils.review.getStatus.invalidate({ pullRequestId }),
+        utils.featureRequest.get.invalidate(),
+      ]);
     },
     onError: (error) => {
       toast.error(error.message);

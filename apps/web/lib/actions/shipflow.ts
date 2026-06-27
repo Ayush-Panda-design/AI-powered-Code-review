@@ -7,12 +7,15 @@ import { requestManualReReview } from "@/features/shipflow/server/feature-workfl
 import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
 import { getActiveWorkspaceForUser, WORKSPACE_COOKIE } from "@/lib/active-workspace";
+import { PROJECT_COOKIE } from "@/lib/active-project";
 import {
   AI_CREDIT_COSTS,
   assertHasCredits,
+  approvePrd,
   connectRepositoryToProject,
   disconnectRepositoryFromProject,
   InsufficientCreditsError,
+  recordPlanApproval,
   resolveWorkspaceIdForFeature,
   sendClarifyJob,
   sendPrdJob,
@@ -135,11 +138,41 @@ export async function rejectReleaseAction(
     }),
     prisma.featureRequest.update({
       where: { id: featureRequestId },
-      data: { status: "fix_needed" },
+      data: { status: "rejected" },
     }),
   ]);
 
   revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
+  revalidatePath("/dashboard/approvals");
+}
+
+export async function approvePrdAction(featureRequestId: string) {
+  const session = await requireSession();
+  const workspace = await getActiveWorkspaceForUser(
+    session.user.id,
+    session.user.name ?? "User",
+  );
+
+  const feature = await prisma.featureRequest.findFirst({
+    where: {
+      id: featureRequestId,
+      project: { workspaceId: workspace.id },
+    },
+    include: { prd: { select: { id: true, status: true } } },
+  });
+
+  if (!feature?.prd) {
+    throw new Error("PRD not found for this feature");
+  }
+
+  if (feature.status !== "awaiting_prd_approval") {
+    throw new Error("Feature is not awaiting PRD approval");
+  }
+
+  await approvePrd(featureRequestId);
+  revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
+  revalidatePath(`/dashboard/prd/${featureRequestId}`);
+  revalidatePath("/dashboard/prd");
 }
 
 export async function requestReReviewAction(featureRequestId: string) {
@@ -219,9 +252,15 @@ export async function approvePlanAction(featureRequestId: string) {
     throw new Error("Feature is not awaiting plan approval");
   }
 
-  await updateFeatureStatus(featureRequestId, "in_development");
+  const result = await recordPlanApproval(
+    featureRequestId,
+    session.user.id,
+    workspace.id,
+  );
+
   revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
   revalidatePath("/dashboard/tasks");
+  return result;
 }
 
 export async function connectRepositoryAction(
@@ -284,4 +323,31 @@ export async function setActiveWorkspaceAction(workspaceId: string) {
   });
 
   revalidatePath("/dashboard");
+}
+
+export async function setActiveProjectAction(projectId: string) {
+  const session = await requireSession();
+  const workspace = await getActiveWorkspaceForUser(
+    session.user.id,
+    session.user.name ?? "User",
+  );
+
+  const project = await prisma.project.findFirst({
+    where: { id: projectId, workspaceId: workspace.id },
+  });
+
+  if (!project) {
+    throw new Error("Project not found");
+  }
+
+  const { cookies } = await import("next/headers");
+  const cookieStore = await cookies();
+  cookieStore.set(PROJECT_COOKIE, projectId, {
+    path: "/",
+    httpOnly: true,
+    sameSite: "lax",
+  });
+
+  revalidatePath("/dashboard/feature-requests");
+  revalidatePath("/dashboard/tasks");
 }

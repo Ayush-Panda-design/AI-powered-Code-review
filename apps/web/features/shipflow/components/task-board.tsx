@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Bot } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,14 @@ export function TaskBoard({ projectId }: TaskBoardProps) {
     onError: (error) => toast.error(error.message),
   });
 
+  const codegen = trpc.task.triggerCodegen.useMutation({
+    onSuccess: async (result) => {
+      toast.success(result.message);
+      await invalidate();
+    },
+    onError: (error) => toast.error(error.message),
+  });
+
   if (isLoading) {
     return <p className="text-sm text-muted-foreground">Loading tasks…</p>;
   }
@@ -92,6 +101,14 @@ export function TaskBoard({ projectId }: TaskBoardProps) {
                       {task.featureRequest.title}
                     </Link>
                     <FeatureStatusBadge status={task.featureRequest.status} />
+                    {"codeGenStatus" in task && task.codeGenStatus !== "none" ? (
+                      <p className="text-xs text-violet-600">
+                        <Bot className="mr-1 inline size-3" />
+                        {task.codeGenStatus === "generating"
+                          ? "Generating draft PR…"
+                          : "Draft PR open"}
+                      </p>
+                    ) : null}
 
                     <div className="flex flex-wrap gap-1 pt-1">
                       {columns
@@ -145,6 +162,21 @@ export function TaskBoard({ projectId }: TaskBoardProps) {
                       >
                         {splitTaskId === task.id ? "Cancel split" : "Split…"}
                       </Button>
+                      {"aiGeneratable" in task &&
+                      task.aiGeneratable !== false &&
+                      task.codeGenStatus === "none" ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="h-7 text-xs"
+                          disabled={codegen.isPending}
+                          onClick={() => codegen.mutate({ taskId: task.id })}
+                        >
+                          <Bot className="size-3" />
+                          Generate
+                        </Button>
+                      ) : null}
                     </div>
 
                     {mergeSourceId === task.id && (
