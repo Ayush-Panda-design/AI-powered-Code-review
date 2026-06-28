@@ -8,6 +8,10 @@ import {
   DashboardListFilters,
   filterBySearch,
 } from "@/features/dashboard/components/dashboard-list-filters";
+import {
+  AutoHideScroll,
+  dashboardPanelHeightClass,
+} from "@/components/ui/auto-hide-scroll";
 import { FEATURE_STATUS_LABELS } from "@/features/dashboard/lib/routes";
 import { FeatureStatusBadge } from "@/features/shipflow/components/feature-status-badge";
 import {
@@ -87,7 +91,9 @@ export function ApprovalsPageClient({ features }: ApprovalsPageClientProps) {
       {filteredFeatures.length === 0 ? (
         <p className="text-sm text-muted-foreground">No features match your filters.</p>
       ) : (
-        <div className="max-h-[min(75vh,800px)] space-y-4 overflow-auto pr-1">
+        <AutoHideScroll
+          className={`${dashboardPanelHeightClass} space-y-4 overflow-auto pr-1`}
+        >
           {filteredFeatures.map((feature) => (
             <Card key={feature.id}>
               <CardContent className="space-y-4 pt-6">
@@ -112,7 +118,7 @@ export function ApprovalsPageClient({ features }: ApprovalsPageClientProps) {
               </CardContent>
             </Card>
           ))}
-        </div>
+        </AutoHideScroll>
       )}
     </div>
   );

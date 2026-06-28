@@ -16,18 +16,21 @@ import {
   DashboardListFilters,
   filterBySearch,
 } from "@/features/dashboard/components/dashboard-list-filters";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
 import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
+import { LoadingState } from "@/components/ui/loading-state";
+import {
+  AutoHideScroll,
+  dashboardPanelHeightClass,
+} from "@/components/ui/auto-hide-scroll";
 import { confidenceLabel } from "@/features/reviews/types/structured-review";
 import { isInFlightPrStatus } from "@repo/services/constants";
 import { trpc } from "@/trpc/client";
+import { cn } from "@/lib/utils";
+
+function shortRepoName(repoFullName: string) {
+  const parts = repoFullName.split("/");
+  return parts.length > 1 ? parts[parts.length - 1]! : repoFullName;
+}
 
 export function ReviewHistoryTableClient() {
   const [search, setSearch] = useState("");
@@ -67,7 +70,13 @@ export function ReviewHistoryTableClient() {
   }, [data?.reviews, search, blockingFilter]);
 
   if (isLoading && !data) {
-    return <p className="text-sm text-muted-foreground">Loading review history…</p>;
+    return (
+      <LoadingState
+        label="Loading review history"
+        description="Gathering AI review results across your pull requests."
+        variant="review"
+      />
+    );
   }
 
   if (!data?.connected) {
@@ -99,7 +108,7 @@ export function ReviewHistoryTableClient() {
   }
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col gap-4">
       <DashboardListFilters
         search={search}
         onSearchChange={setSearch}
@@ -121,65 +130,93 @@ export function ReviewHistoryTableClient() {
       {filteredReviews.length === 0 ? (
         <p className="text-sm text-muted-foreground">No reviews match your filters.</p>
       ) : (
-        <div className="max-h-[min(70vh,720px)] overflow-auto rounded-lg border">
-          <Table>
-            <TableHeader className="sticky top-0 z-10 bg-background">
-              <TableRow>
-                <TableHead>Repository</TableHead>
-                <TableHead>PR</TableHead>
-                <TableHead>Feature</TableHead>
-                <TableHead>Blocking</TableHead>
-                <TableHead>Confidence</TableHead>
-                <TableHead>Summary</TableHead>
-                <TableHead>When</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredReviews.map((review) => (
-                <TableRow key={review.id}>
-                  <TableCell>{review.pullRequest.repoFullName}</TableCell>
-                  <TableCell>#{review.pullRequest.prNumber}</TableCell>
-                  <TableCell>
-                    {review.featureRequest ? (
-                      <Link
-                        href={`${DASHBOARD_BASE_PATH}/feature-requests/${review.featureRequest.id}`}
-                        className="hover:underline"
-                      >
-                        {review.featureRequest.title}
-                      </Link>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {review.blockingCount > 0 ? (
-                      <Badge variant="outline" className="border-destructive/40 text-destructive">
-                        {review.blockingCount}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground">0</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {review.confidenceScore != null ? (
-                      <span title={confidenceLabel(review.confidenceScore)}>
-                        {review.confidenceScore}%
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell className="max-w-md truncate text-sm">
+        <AutoHideScroll
+          className={`${dashboardPanelHeightClass} overflow-y-auto overflow-x-hidden rounded-lg border`}
+        >
+          <div className="sticky top-0 z-10 grid grid-cols-[2.75rem_minmax(0,1fr)_6.5rem] gap-x-3 border-b bg-background px-3 py-2 text-xs font-medium text-muted-foreground">
+            <span>PR</span>
+            <span>Review</span>
+            <span className="text-right">Result</span>
+          </div>
+          <div className="divide-y">
+            {filteredReviews.map((review) => (
+              <div
+                key={review.id}
+                className="grid grid-cols-[2.75rem_minmax(0,1fr)_6.5rem] items-start gap-x-3 px-3 py-3"
+              >
+                <div className="pt-0.5 text-sm font-medium">
+                  #{review.pullRequest.prNumber}
+                </div>
+
+                <div className="min-w-0">
+                  <p
+                    className="truncate text-sm font-medium"
+                    title={review.pullRequest.title}
+                  >
+                    {review.pullRequest.title}
+                  </p>
+                  <p
+                    className="mt-0.5 truncate text-xs text-muted-foreground"
+                    title={review.pullRequest.repoFullName}
+                  >
+                    {shortRepoName(review.pullRequest.repoFullName)}
+                  </p>
+                  <p
+                    className="mt-1 line-clamp-2 text-xs leading-relaxed text-muted-foreground"
+                    title={review.summary}
+                  >
                     {review.summary}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {formatDistanceToNow(new Date(review.createdAt), { addSuffix: true })}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                  </p>
+                  {review.featureRequest ? (
+                    <Link
+                      href={`${DASHBOARD_BASE_PATH}/feature-requests/${review.featureRequest.id}`}
+                      className="mt-1 block truncate text-xs text-primary hover:underline"
+                      title={review.featureRequest.title}
+                    >
+                      {review.featureRequest.title}
+                    </Link>
+                  ) : null}
+                </div>
+
+                <div className="flex min-w-0 flex-col items-end gap-1 pt-0.5 text-right">
+                  {review.blockingCount > 0 ? (
+                    <Badge
+                      variant="outline"
+                      className="border-destructive/40 text-[11px] text-destructive"
+                    >
+                      {review.blockingCount} blocking
+                    </Badge>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">0 blocking</span>
+                  )}
+                  {review.confidenceScore != null ? (
+                    <span
+                      className={cn(
+                        "text-[11px] font-medium",
+                        review.confidenceScore >= 80
+                          ? "text-emerald-600 dark:text-emerald-400"
+                          : "text-muted-foreground",
+                      )}
+                      title={confidenceLabel(review.confidenceScore)}
+                    >
+                      {review.confidenceScore}%
+                    </span>
+                  ) : (
+                    <span className="text-[11px] text-muted-foreground">—</span>
+                  )}
+                  <span
+                    className="text-[11px] text-muted-foreground"
+                    title={new Date(review.createdAt).toLocaleString()}
+                  >
+                    {formatDistanceToNow(new Date(review.createdAt), {
+                      addSuffix: true,
+                    })}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </AutoHideScroll>
       )}
     </div>
   );

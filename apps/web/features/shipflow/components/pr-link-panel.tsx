@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ButtonLoadingLabel, LoadingIllustration } from "@/components/ui/loading-illustration";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Select,
@@ -108,7 +109,13 @@ export function PrLinkPanel({
             Auto-link via branch <code>feature/&lt;id&gt;</code> or title{" "}
             <code>[shipflow:&lt;id&gt;]</code>, or pick from connected repos:
           </p>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {isLoading ? (
+              <span className="inline-flex items-center gap-2 text-sm text-muted-foreground">
+                <LoadingIllustration variant="pull-requests" size="sm" />
+                Loading open PRs…
+              </span>
+            ) : null}
             <Select
               value={selectedPrId}
               onValueChange={(value) => {
@@ -146,7 +153,11 @@ export function PrLinkPanel({
                 })
               }
             >
-              {linkMutation.isPending ? "Linking…" : "Link PR"}
+              {linkMutation.isPending ? (
+                <ButtonLoadingLabel>Linking…</ButtonLoadingLabel>
+              ) : (
+                "Link PR"
+              )}
             </Button>
           </div>
         </div>

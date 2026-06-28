@@ -19,6 +19,11 @@ import {
 import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
 import { RunReviewButton } from "@/features/dashboard/components/run-review-button";
 import { SyncPullRequestsButton } from "@/features/dashboard/components/sync-pull-requests-button";
+import { LoadingState } from "@/components/ui/loading-state";
+import {
+  AutoHideScroll,
+  dashboardPanelHeightClass,
+} from "@/components/ui/auto-hide-scroll";
 import {
   confidenceLabel,
   computeConfidenceScore,
@@ -190,7 +195,11 @@ export function PullRequestsTableClient({
 
   if (isLoading && pullRequests.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">Loading pull requests…</p>
+      <LoadingState
+        label="Loading pull requests"
+        description="Syncing open PRs from your connected repositories."
+        variant="pull-requests"
+      />
     );
   }
 
@@ -260,7 +269,9 @@ export function PullRequestsTableClient({
       {filteredPullRequests.length === 0 ? (
         <p className="text-sm text-muted-foreground">No pull requests match your filters.</p>
       ) : (
-        <div className="max-h-[min(70vh,720px)] overflow-y-auto overflow-x-hidden rounded-lg border">
+        <AutoHideScroll
+          className={`${dashboardPanelHeightClass} overflow-y-auto overflow-x-hidden rounded-lg border`}
+        >
           <div className="sticky top-0 z-10 grid grid-cols-[2.75rem_minmax(0,1fr)_10.5rem] gap-x-3 border-b bg-background px-3 py-2 text-xs font-medium text-muted-foreground">
             <span>PR</span>
             <span>Change</span>
@@ -384,7 +395,7 @@ export function PullRequestsTableClient({
               );
             })}
           </div>
-        </div>
+        </AutoHideScroll>
       )}
     </div>
   );

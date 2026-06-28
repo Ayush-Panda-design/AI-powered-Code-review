@@ -12,7 +12,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingListRows } from "@/components/ui/loading-state";
 import {
   Table,
   TableBody,
@@ -89,13 +89,7 @@ export function ReposList({
   const totalCount = data?.pages[0]?.totalCount;
 
   if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <Skeleton key={index} className="h-12 w-full rounded-lg" />
-        ))}
-      </div>
-    );
+    return <LoadingListRows rows={5} variant="repos" />;
   }
 
   if (error) {
@@ -190,13 +184,7 @@ export function ReposList({
 
       <div ref={sentinelRef} className="h-1" />
 
-      {isFetchingNextPage ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Skeleton key={index} className="h-10 w-full rounded-lg" />
-          ))}
-        </div>
-      ) : null}
+      {isFetchingNextPage ? <LoadingListRows rows={3} variant="repos" /> : null}
     </div>
   );
 }

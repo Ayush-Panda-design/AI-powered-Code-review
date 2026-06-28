@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ButtonLoadingLabel } from "@/components/ui/loading-illustration";
 import { signInWithGithubAction } from "@/lib/actions/auth";
 import { resolveCallbackUrl } from "@/lib/auth-proxy";
 
@@ -40,7 +41,11 @@ function GithubSignInFormContent() {
       onClick={handleSignIn}
     >
       <GithubIcon className="size-4" />
-      {isPending ? "Redirecting to GitHub…" : "Sign in with GitHub"}
+      {isPending ? (
+        <ButtonLoadingLabel>Redirecting to GitHub…</ButtonLoadingLabel>
+      ) : (
+        "Sign in with GitHub"
+      )}
     </Button>
   );
 }

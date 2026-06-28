@@ -17,6 +17,8 @@ import {
 } from "@/features/shipflow/components/release-approval-panel";
 import { PrdDiffPanel } from "@/features/shipflow/components/prd-diff-panel";
 import { WorkflowStatusCard } from "@/features/shipflow/components/workflow-status-card";
+import { LoadingState } from "@/components/ui/loading-state";
+import { ButtonLoadingLabel, LoadingIllustration } from "@/components/ui/loading-illustration";
 import {
   aiJobToastId,
   getCreditAffordance,
@@ -139,7 +141,14 @@ export function FeatureRequestDetailClient({
   );
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading feature…</p>;
+    return (
+      <LoadingState
+        label="Loading feature"
+        description="Fetching PRD, tasks, and workflow status."
+        variant="features"
+        size="lg"
+      />
+    );
   }
 
   if (error || !feature) {
@@ -188,9 +197,11 @@ export function FeatureRequestDetailClient({
               clarifyMutation.mutate({ featureRequestId: featureId });
             }}
           >
-            {clarifyMutation.isPending
-              ? "Starting…"
-              : `AI clarify (${AI_CREDIT_COSTS.clarify} cr)`}
+            {clarifyMutation.isPending ? (
+              <ButtonLoadingLabel>Starting…</ButtonLoadingLabel>
+            ) : (
+              `AI clarify (${AI_CREDIT_COSTS.clarify} cr)`
+            )}
           </Button>
           <Button
             variant="outline"
@@ -206,9 +217,11 @@ export function FeatureRequestDetailClient({
               prdMutation.mutate({ featureRequestId: featureId });
             }}
           >
-            {prdMutation.isPending
-              ? "Starting…"
-              : `Generate PRD (${AI_CREDIT_COSTS.prd} cr)`}
+            {prdMutation.isPending ? (
+              <ButtonLoadingLabel>Starting…</ButtonLoadingLabel>
+            ) : (
+              `Generate PRD (${AI_CREDIT_COSTS.prd} cr)`
+            )}
           </Button>
           <Button
             variant="outline"
@@ -228,9 +241,11 @@ export function FeatureRequestDetailClient({
               tasksMutation.mutate({ featureRequestId: featureId });
             }}
           >
-            {tasksMutation.isPending
-              ? "Starting…"
-              : `Generate tasks (${AI_CREDIT_COSTS.tasks} cr)`}
+            {tasksMutation.isPending ? (
+              <ButtonLoadingLabel>Starting…</ButtonLoadingLabel>
+            ) : (
+              `Generate tasks (${AI_CREDIT_COSTS.tasks} cr)`
+            )}
           </Button>
         </div>
       </div>
@@ -315,7 +330,11 @@ export function FeatureRequestDetailClient({
                   size="sm"
                   disabled={clarifyReplyMutation.isPending || !clarifyReply.trim()}
                 >
-                  {clarifyReplyMutation.isPending ? "Saving…" : "Send reply"}
+                  {clarifyReplyMutation.isPending ? (
+                    <ButtonLoadingLabel>Saving…</ButtonLoadingLabel>
+                  ) : (
+                    "Send reply"
+                  )}
                 </Button>
               </form>
             )}
@@ -352,9 +371,11 @@ export function FeatureRequestDetailClient({
                 });
               }}
             >
-              {isApprovingPrd || approvePrdMutation.isPending
-                ? "Approving…"
-                : "Approve PRD"}
+              {isApprovingPrd || approvePrdMutation.isPending ? (
+                <ButtonLoadingLabel>Approving…</ButtonLoadingLabel>
+              ) : (
+                "Approve PRD"
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -370,7 +391,12 @@ export function FeatureRequestDetailClient({
               Team review required before development.{" "}
               {planApprovalStatus
                 ? `${planApprovalStatus.approvals.length} of ${planApprovalStatus.required} approval(s) recorded.`
-                : "Loading approval status…"}
+                : (
+                  <span className="inline-flex items-center gap-2">
+                    <LoadingIllustration variant="inline" size="sm" />
+                    Loading approval status…
+                  </span>
+                )}
             </p>
             {planApprovalStatus && planApprovalStatus.approvals.length > 0 && (
               <ul className="space-y-1 text-sm">

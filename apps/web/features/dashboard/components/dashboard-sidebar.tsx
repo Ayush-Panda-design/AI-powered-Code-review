@@ -17,6 +17,7 @@ import {
   SidebarMenuItem,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { AutoHideScroll } from "@/components/ui/auto-hide-scroll";
 import { dashboardRoutes } from "@/features/dashboard/lib/routes";
 import { WorkspaceSwitcher } from "@/features/dashboard/components/workspace-switcher";
 
@@ -55,34 +56,36 @@ export function DashboardSidebar({
         </SidebarMenu>
       </SidebarHeader>
 
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Navigation</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {dashboardRoutes.map((route) => {
-                const isActive =
-                  route.href === "/dashboard"
-                    ? pathname === "/dashboard"
-                    : pathname === route.href ||
-                      pathname.startsWith(`${route.href}/`);
+      <SidebarContent className="overflow-hidden p-0">
+        <AutoHideScroll className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2">
+          <SidebarGroup>
+            <SidebarGroupLabel>Navigation</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {dashboardRoutes.map((route) => {
+                  const isActive =
+                    route.href === "/dashboard"
+                      ? pathname === "/dashboard"
+                      : pathname === route.href ||
+                        pathname.startsWith(`${route.href}/`);
 
-                return (
-                  <SidebarMenuItem key={route.title}>
-                    <SidebarMenuButton
-                      isActive={isActive}
-                      tooltip={route.title}
-                      render={<Link href={route.href} />}
-                    >
-                      <route.icon />
-                      <span>{route.title}</span>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+                  return (
+                    <SidebarMenuItem key={route.title}>
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        tooltip={route.title}
+                        render={<Link href={route.href} />}
+                      >
+                        <route.icon />
+                        <span>{route.title}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </AutoHideScroll>
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-2">

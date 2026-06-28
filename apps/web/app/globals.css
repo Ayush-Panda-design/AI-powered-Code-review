@@ -39,6 +39,10 @@
   --color-popover: var(--popover);
   --color-card-foreground: var(--card-foreground);
   --color-card: var(--card);
+  --color-status-success: var(--status-success);
+  --color-status-warning: var(--status-warning);
+  --color-status-progress: var(--status-progress);
+  --color-status-error: var(--status-error);
   --radius-sm: calc(var(--radius) * 0.6);
   --radius-md: calc(var(--radius) * 0.8);
   --radius-lg: var(--radius);
@@ -81,6 +85,10 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+  --status-success: oklch(0.62 0.17 145);
+  --status-warning: oklch(0.82 0.16 95);
+  --status-progress: oklch(0.72 0.18 55);
+  --status-error: oklch(0.58 0.22 25);
 }
 
 .dark {
@@ -115,6 +123,10 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+  --status-success: oklch(0.72 0.17 145);
+  --status-warning: oklch(0.84 0.14 95);
+  --status-progress: oklch(0.76 0.16 55);
+  --status-error: oklch(0.68 0.2 25);
 }
 
 @layer base {
@@ -129,5 +141,219 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer utilities {
+  /* Hidden — scroll via trackpad, wheel, or touch */
+  .no-scrollbar,
+  .scrollbar-none {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar,
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Thin thumb — visible only while actively scrolling (see AutoHideScroll) */
+  .scrollbar-auto-hide {
+    scrollbar-width: thin;
+    scrollbar-color: transparent transparent;
+  }
+
+  .scrollbar-auto-hide[data-scrolling="true"] {
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 38%, transparent)
+      transparent;
+  }
+
+  .scrollbar-auto-hide::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+  }
+
+  .scrollbar-auto-hide::-webkit-scrollbar-button {
+    display: none;
+    height: 0;
+    width: 0;
+  }
+
+  .scrollbar-auto-hide::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-auto-hide::-webkit-scrollbar-thumb {
+    background-color: transparent;
+    border-radius: 9999px;
+  }
+
+  .scrollbar-auto-hide[data-scrolling="true"]::-webkit-scrollbar-thumb {
+    background-color: color-mix(in oklch, var(--muted-foreground) 38%, transparent);
+  }
+
+  /* Loading illustration animations */
+  @keyframes loading-orbit {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  @keyframes loading-wave {
+    0%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.55;
+    }
+    50% {
+      transform: translateY(-3px);
+      opacity: 1;
+    }
+  }
+
+  @keyframes loading-pulse-ring {
+    0% {
+      transform: scale(0.85);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(1.25);
+      opacity: 0;
+    }
+  }
+
+  @keyframes loading-node-pulse {
+    0%,
+    100% {
+      transform: scale(1);
+      opacity: 0.75;
+    }
+    50% {
+      transform: scale(1.12);
+      opacity: 1;
+    }
+  }
+
+  @keyframes loading-scan-beam {
+    0%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.35;
+    }
+    50% {
+      transform: translateY(44px);
+      opacity: 1;
+    }
+  }
+
+  @keyframes loading-shimmer-line {
+    0%,
+    100% {
+      opacity: 0.35;
+    }
+    50% {
+      opacity: 0.9;
+    }
+  }
+
+  @keyframes loading-card-bounce {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-3px);
+    }
+  }
+
+  @keyframes loading-bar-grow {
+    0%,
+    100% {
+      transform: scaleY(0.55);
+      transform-origin: bottom;
+      opacity: 0.6;
+    }
+    50% {
+      transform: scaleY(1);
+      transform-origin: bottom;
+      opacity: 1;
+    }
+  }
+
+  @keyframes loading-draw {
+    0%,
+    100% {
+      stroke-dashoffset: 8;
+      opacity: 0.5;
+    }
+    50% {
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+  }
+
+  @keyframes loading-shimmer-bar {
+    0% {
+      background-position: 200% 0;
+    }
+    100% {
+      background-position: -200% 0;
+    }
+  }
+
+  .loading-orbit {
+    transform-origin: 40px 40px;
+    animation: loading-orbit 4s linear infinite;
+  }
+
+  .group\/loading:hover .loading-orbit {
+    animation-duration: 2s;
+  }
+
+  .loading-inline-dot {
+    animation: loading-wave 0.75s ease-in-out infinite;
+  }
+
+  .loading-pulse-ring {
+    transform-origin: center;
+    animation: loading-pulse-ring 1.8s ease-out infinite;
+  }
+
+  .loading-node-pulse {
+    transform-origin: center;
+    animation: loading-node-pulse 1.4s ease-in-out infinite;
+  }
+
+  .loading-scan-beam {
+    animation: loading-scan-beam 2s ease-in-out infinite;
+  }
+
+  .loading-shimmer-line {
+    animation: loading-shimmer-line 1.6s ease-in-out infinite;
+  }
+
+  .loading-card-bounce {
+    animation: loading-card-bounce 1.2s ease-in-out infinite;
+  }
+
+  .loading-bar-grow {
+    animation: loading-bar-grow 1.4s ease-in-out infinite;
+  }
+
+  .loading-draw {
+    stroke-dasharray: 12;
+    animation: loading-draw 1.6s ease-in-out infinite;
+  }
+
+  .loading-shimmer-bar {
+    background: linear-gradient(
+      90deg,
+      var(--muted) 0%,
+      color-mix(in oklch, var(--status-warning) 35%, var(--muted)) 35%,
+      color-mix(in oklch, var(--status-progress) 35%, var(--muted)) 65%,
+      var(--muted) 100%
+    );
+    background-size: 200% 100%;
+    animation: loading-shimmer-bar 1.8s linear infinite;
   }
 }

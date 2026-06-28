@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ButtonLoadingLabel } from "@/components/ui/loading-illustration";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
@@ -56,7 +57,11 @@ function ApproveReleaseForm({
         rows={3}
       />
       <Button type="submit" size="sm" disabled={isPending}>
-        {isPending ? "Approving…" : "Approve & ship"}
+        {isPending ? (
+          <ButtonLoadingLabel>Approving…</ButtonLoadingLabel>
+        ) : (
+          "Approve & ship"
+        )}
       </Button>
     </form>
   );
@@ -101,7 +106,11 @@ function RejectReleaseForm({
         size="sm"
         disabled={isPending}
       >
-        {isPending ? "Rejecting…" : "Reject release"}
+        {isPending ? (
+          <ButtonLoadingLabel>Rejecting…</ButtonLoadingLabel>
+        ) : (
+          "Reject release"
+        )}
       </Button>
     </form>
   );
@@ -152,7 +161,11 @@ export function ReleaseApprovalPanel({
                 runAction(() => requestReReviewAction(featureRequestId))
               }
             >
-              {isPending ? "Requesting…" : "Request re-review now"}
+              {isPending ? (
+                <ButtonLoadingLabel>Requesting…</ButtonLoadingLabel>
+              ) : (
+                "Request re-review now"
+              )}
             </Button>
           </div>
 

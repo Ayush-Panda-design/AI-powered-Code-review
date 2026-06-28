@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ButtonLoadingLabel } from "@/components/ui/loading-illustration";
 import { Textarea } from "@/components/ui/textarea";
 import { updatePrdAction } from "@/lib/actions/shipflow";
 
@@ -43,7 +44,11 @@ export function PrdEditorForm({
         placeholder="PRD markdown…"
       />
       <Button type="submit" disabled={isPending || !markdown.trim()}>
-        {isPending ? "Saving…" : "Save PRD"}
+        {isPending ? (
+          <ButtonLoadingLabel>Saving…</ButtonLoadingLabel>
+        ) : (
+          "Save PRD"
+        )}
       </Button>
     </form>
   );

@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ButtonLoadingLabel } from "@/components/ui/loading-illustration";
 import {
   Field,
   FieldGroup,
@@ -66,7 +67,11 @@ function EmailSignInFormContent() {
             </p>
           ) : null}
           <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? "Signing in..." : "Sign in with email"}
+            {isPending ? (
+              <ButtonLoadingLabel>Signing in…</ButtonLoadingLabel>
+            ) : (
+              "Sign in with email"
+            )}
           </Button>
         </FieldGroup>
       </FieldSet>

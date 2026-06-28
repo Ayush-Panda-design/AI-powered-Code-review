@@ -1,9 +1,10 @@
 "use client";
 
-import { Loader2, Play } from "lucide-react";
+import { Play } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { LoadingIllustration } from "@/components/ui/loading-illustration";
 import {
   getStaleProcessingMs,
   isInFlightPrStatus,
@@ -72,7 +73,7 @@ export function RunReviewButton({
       className={cn("w-full", className)}
     >
       {inFlight || runReview.isPending ? (
-        <Loader2 className="animate-spin" />
+        <LoadingIllustration variant="inline" size="sm" />
       ) : (
         <Play />
       )}

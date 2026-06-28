@@ -6,6 +6,11 @@ import {
   DashboardListFilters,
   filterBySearch,
 } from "@/features/dashboard/components/dashboard-list-filters";
+import { LoadingState } from "@/components/ui/loading-state";
+import {
+  AutoHideScroll,
+  dashboardPanelHeightClass,
+} from "@/components/ui/auto-hide-scroll";
 import { trpc } from "@/trpc/client";
 
 export function ActivityFeed({ workspaceId }: { workspaceId: string }) {
@@ -35,7 +40,14 @@ export function ActivityFeed({ workspaceId }: { workspaceId: string }) {
   }, [events, search, typeFilter]);
 
   if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading activity…</p>;
+    return (
+      <LoadingState
+        label="Loading activity"
+        description="Pulling recent reviews, approvals, and workflow events."
+        variant="activity"
+        className="py-6"
+      />
+    );
   }
 
   if (events.length === 0) {
@@ -72,7 +84,8 @@ export function ActivityFeed({ workspaceId }: { workspaceId: string }) {
       {filteredEvents.length === 0 ? (
         <p className="text-sm text-muted-foreground">No activity matches your filters.</p>
       ) : (
-        <ul className="max-h-[min(70vh,720px)] space-y-3 overflow-auto pr-1 text-sm">
+        <AutoHideScroll className={`${dashboardPanelHeightClass} overflow-auto pr-1`}>
+          <ul className="space-y-3 text-sm">
           {filteredEvents.map((event) => (
             <li key={event.id} className="rounded-lg border p-3">
               <div className="flex items-center justify-between gap-2">
@@ -86,7 +99,8 @@ export function ActivityFeed({ workspaceId }: { workspaceId: string }) {
               ) : null}
             </li>
           ))}
-        </ul>
+          </ul>
+        </AutoHideScroll>
       )}
     </div>
   );

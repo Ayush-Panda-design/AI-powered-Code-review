@@ -6,14 +6,20 @@ import { Plus } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ButtonLoadingLabel } from "@/components/ui/loading-illustration";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DashboardListFilters,
   filterBySearch,
 } from "@/features/dashboard/components/dashboard-list-filters";
+import {
+  AutoHideScroll,
+  dashboardPanelHeightClass,
+} from "@/components/ui/auto-hide-scroll";
 import { ProjectPicker } from "@/features/dashboard/components/project-picker";
 import { FEATURE_STATUS_LABELS } from "@/features/dashboard/lib/routes";
 import { FeatureStatusBadge } from "@/features/shipflow/components/feature-status-badge";
+import { LoadingState } from "@/components/ui/loading-state";
 import { trpc } from "@/trpc/client";
 
 type FeatureRequestsPageClientProps = {
@@ -130,7 +136,11 @@ export function FeatureRequestsPageClient({
               disabled={createMutation.isPending}
             >
               <Plus className="mr-2 size-4" />
-              {createMutation.isPending ? "Creating…" : "Create request"}
+              {createMutation.isPending ? (
+                <ButtonLoadingLabel>Creating…</ButtonLoadingLabel>
+              ) : (
+                "Create request"
+              )}
             </Button>
           </form>
         </CardContent>
@@ -157,9 +167,16 @@ export function FeatureRequestsPageClient({
         </select>
       </DashboardListFilters>
 
-      <div className="grid max-h-[min(70vh,720px)] gap-3 overflow-auto pr-1">
+      <AutoHideScroll
+        className={`${dashboardPanelHeightClass} grid gap-3 overflow-auto pr-1`}
+      >
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading features…</p>
+          <LoadingState
+            label="Loading feature requests"
+            description="Fetching ideas and workflow status for this project."
+            variant="features"
+            className="py-8"
+          />
         ) : filteredFeatures.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {features.length === 0
@@ -190,7 +207,7 @@ export function FeatureRequestsPageClient({
             </Link>
           ))
         )}
-      </div>
+      </AutoHideScroll>
     </div>
   );
 }

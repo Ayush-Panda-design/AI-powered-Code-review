@@ -9,6 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { trpc } from "@/trpc/client";
+import { LoadingState } from "@/components/ui/loading-state";
 
 export default function ReviewSlaPage() {
   const { data, isLoading } = trpc.review.reviewSlaMetrics.useQuery();
@@ -24,7 +25,12 @@ export default function ReviewSlaPage() {
       </div>
 
       {isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading metrics…</p>
+        <LoadingState
+          label="Loading review metrics"
+          description="Calculating time-to-first-review across repositories."
+          variant="metrics"
+          className="py-8"
+        />
       ) : (
         <Table>
           <TableHeader>
