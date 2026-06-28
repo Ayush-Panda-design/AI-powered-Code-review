@@ -6,7 +6,11 @@ import {
   parseReviewFindings,
   recordFindingFeedback,
   resolveWorkspaceIdForInstallation,
+  sendGitHubSyncJob,
   sendReviewJob,
+  findActiveSyncRun,
+  serializeSyncRun,
+  markStaleSyncRunsFailed,
 } from "@repo/services";
 import { isInFlightPrStatus, getStaleProcessingMs } from "@repo/services/constants";
 import { TRPCError } from "@trpc/server";
@@ -14,6 +18,39 @@ import { prisma } from "@repo/database";
 
 import { throwTrpcCreditError } from "../../credit-errors";
 import { protectedProcedure, router } from "../../trpc";
+
+async function requireInstallation(ctx: { userId: string }) {
+  const installation = await prisma.gitHubInstallation.findUnique({
+    where: { userId: ctx.userId },
+  });
+
+  if (!installation) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "GitHub App is not connected.",
+    });
+  }
+
+  return installation;
+}
+
+async function requireWorkspaceId(installation: {
+  installationId: number;
+  workspaceId: string | null;
+}) {
+  const workspaceId =
+    installation.workspaceId ??
+    (await resolveWorkspaceIdForInstallation(installation.installationId));
+
+  if (!workspaceId) {
+    throw new TRPCError({
+      code: "NOT_FOUND",
+      message: "Workspace not found.",
+    });
+  }
+
+  return workspaceId;
+}
 
 export const reviewRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
@@ -54,6 +91,7 @@ export const reviewRouter = router({
       include: {
         pullRequest: {
           select: {
+            id: true,
             repoFullName: true,
             prNumber: true,
             title: true,
@@ -126,6 +164,40 @@ export const reviewRouter = router({
         linesChanged: pullRequest.linesChanged,
         source: pullRequest.source,
         latestReview: pullRequest.aiReviews[0] ?? null,
+      };
+    }),
+
+  getPullRequestReviewDetail: protectedProcedure
+    .input(z.object({ pullRequestId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const installation = await requireInstallation(ctx);
+
+      const pullRequest = await prisma.pullRequest.findFirst({
+        where: {
+          id: input.pullRequestId,
+          installationId: installation.installationId,
+        },
+        select: {
+          id: true,
+          title: true,
+          repoFullName: true,
+          prNumber: true,
+          reviewComment: true,
+          status: true,
+        },
+      });
+
+      if (!pullRequest) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Pull request not found." });
+      }
+
+      return {
+        id: pullRequest.id,
+        title: pullRequest.title,
+        repoFullName: pullRequest.repoFullName,
+        prNumber: pullRequest.prNumber,
+        reviewComment: pullRequest.reviewComment,
+        status: pullRequest.status,
       };
     }),
 
@@ -321,6 +393,90 @@ export const reviewRouter = router({
     }));
 
     return { metrics };
+  }),
+
+  startSync: protectedProcedure.mutation(async ({ ctx }) => {
+    const installation = await requireInstallation(ctx);
+    const workspaceId = await requireWorkspaceId(installation);
+
+    const active = await findActiveSyncRun(workspaceId);
+    if (active) {
+      return {
+        syncId: active.id,
+        alreadyRunning: true,
+        status: serializeSyncRun(active),
+      };
+    }
+
+    const syncRun = await prisma.syncRun.create({
+      data: {
+        workspaceId,
+        installationId: installation.installationId,
+        status: "running",
+      },
+    });
+
+    await sendGitHubSyncJob({
+      syncRunId: syncRun.id,
+      installationId: installation.installationId,
+      workspaceId,
+    });
+
+    return {
+      syncId: syncRun.id,
+      alreadyRunning: false,
+      status: serializeSyncRun(syncRun),
+    };
+  }),
+
+  getSyncStatus: protectedProcedure
+    .input(z.object({ syncId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const installation = await requireInstallation(ctx);
+      const workspaceId = await requireWorkspaceId(installation);
+
+      await markStaleSyncRunsFailed(workspaceId);
+
+      const syncRun = await prisma.syncRun.findFirst({
+        where: {
+          id: input.syncId,
+          workspaceId,
+        },
+      });
+
+      if (!syncRun) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Sync not found." });
+      }
+
+      return serializeSyncRun(syncRun);
+    }),
+
+  getActiveSync: protectedProcedure.query(async ({ ctx }) => {
+    const installation = await prisma.gitHubInstallation.findUnique({
+      where: { userId: ctx.userId },
+    });
+
+    if (!installation) {
+      return { active: false as const };
+    }
+
+    const workspaceId =
+      installation.workspaceId ??
+      (await resolveWorkspaceIdForInstallation(installation.installationId));
+
+    if (!workspaceId) {
+      return { active: false as const };
+    }
+
+    const active = await findActiveSyncRun(workspaceId);
+    if (!active) {
+      return { active: false as const };
+    }
+
+    return {
+      active: true as const,
+      status: serializeSyncRun(active),
+    };
   }),
 });
 

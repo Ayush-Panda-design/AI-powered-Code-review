@@ -3,6 +3,7 @@ import { serve } from "inngest/next";
 import { inngest } from "@/features/inngest/client";
 import { reviewPullRequest } from "@/features/reviews/server/review-pr-function";
 import { checkStalePullRequests } from "@/features/reviews/server/stale-pr-cron";
+import { syncGitHubPullRequests } from "@/features/reviews/server/sync-github-inngest";
 import {
   clarifyFeatureRequest,
   generatePrd,
@@ -21,5 +22,6 @@ export const { GET, POST, PUT } = serve({
     checkReleaseReadiness,
     generateTaskCode,
     checkStalePullRequests,
+    syncGitHubPullRequests,
   ],
 });

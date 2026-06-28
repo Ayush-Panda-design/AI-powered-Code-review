@@ -18,7 +18,17 @@ import {
 } from "@/components/ui/empty";
 import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
 import { RunReviewButton } from "@/features/dashboard/components/run-review-button";
+import {
+  ClickableReviewSection,
+  PullRequestReviewDialog,
+  pullRequestHasReviewNotes,
+} from "@/features/dashboard/components/pull-request-review-dialog";
 import { SyncPullRequestsButton } from "@/features/dashboard/components/sync-pull-requests-button";
+import { LoadingState } from "@/components/ui/loading-state";
+import {
+  AutoHideScroll,
+  dashboardPanelHeightClass,
+} from "@/components/ui/auto-hide-scroll";
 import {
   confidenceLabel,
   computeConfidenceScore,
@@ -58,10 +68,12 @@ function ReviewStatusCell({
   status,
   reviewComment,
   updatedAt,
+  confidenceScore,
 }: {
   status: string;
   reviewComment: string | null;
   updatedAt: string;
+  confidenceScore: number | null;
 }) {
   const [, setTick] = useState(0);
 
@@ -76,6 +88,7 @@ function ReviewStatusCell({
 
   const isFailed = status === "failed";
   const isProcessing = isInFlightPrStatus(status);
+  const isReviewed = status === "reviewed" || status === "completed";
   const progressHint =
     reviewComment?.startsWith("Review in progress:")
       ? reviewComment.replace("Review in progress:", "").trim()
@@ -86,29 +99,60 @@ function ReviewStatusCell({
       : null;
 
   return (
-    <div className="flex flex-col gap-1">
-      <Badge
-        variant="outline"
-        className={cn(
-          "w-fit font-medium capitalize",
-          statusStyles[status] ??
-            "border-border bg-muted text-muted-foreground",
-        )}
-      >
-        {status}
-      </Badge>
+    <div className="flex min-w-0 flex-col items-end gap-1.5 text-right">
+      <div className="flex flex-wrap items-center justify-end gap-x-2 gap-y-1">
+        <Badge
+          variant="outline"
+          className={cn(
+            "h-5 shrink-0 px-1.5 text-[10px] font-medium capitalize",
+            statusStyles[status] ??
+              "border-border bg-muted text-muted-foreground",
+          )}
+        >
+          {status}
+        </Badge>
+        {confidenceScore != null && !isProcessing ? (
+          <span
+            className={cn(
+              "text-[11px] tabular-nums",
+              confidenceScore >= 80
+                ? "text-emerald-600 dark:text-emerald-400"
+                : confidenceScore >= 60
+                  ? "text-amber-600 dark:text-amber-400"
+                  : "text-muted-foreground",
+            )}
+            title={confidenceLabel(confidenceScore)}
+          >
+            {confidenceScore}%
+          </span>
+        ) : null}
+        {!isProcessing && confidenceScore == null && !isFailed ? (
+          <span className="text-[11px] text-muted-foreground">No score</span>
+        ) : null}
+      </div>
+
       {isProcessing ? (
-        <span className="line-clamp-2 text-[11px] leading-tight text-sky-600 dark:text-sky-400">
+        <p className="line-clamp-2 text-[11px] leading-snug text-sky-600 dark:text-sky-400">
           {progressHint ?? "Queued"} · {formatElapsed(updatedAt)}
-        </span>
+        </p>
       ) : null}
+
       {failureMessage ? (
-        <span
-          className="line-clamp-2 text-[11px] leading-tight text-destructive"
+        <p
+          className="line-clamp-2 text-[11px] leading-snug text-destructive"
           title={failureMessage}
         >
           {failureMessage}
-        </span>
+        </p>
+      ) : null}
+
+      {isReviewed && !isProcessing ? (
+        <p
+          className="text-[10px] text-muted-foreground/80"
+          title={new Date(updatedAt).toLocaleString()}
+        >
+          {compactUpdatedAt(updatedAt)}
+        </p>
       ) : null}
     </div>
   );
@@ -139,6 +183,15 @@ export function PullRequestsTableClient({
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [linkFilter, setLinkFilter] = useState("all");
+  const [reviewDialogOpen, setReviewDialogOpen] = useState(false);
+  const [selectedPullRequest, setSelectedPullRequest] = useState<{
+    id: string;
+    title: string;
+    repoFullName: string;
+    prNumber: number;
+    reviewComment: string | null;
+    status: string;
+  } | null>(null);
 
   const { data, isLoading } = trpc.review.list.useQuery(undefined, {
     refetchInterval: (query) => {
@@ -175,7 +228,21 @@ export function PullRequestsTableClient({
       items = items.filter((pullRequest) => !pullRequest.featureRequest);
     }
 
-    return items;
+    const statusPriority: Record<string, number> = {
+      processing: 0,
+      pending: 1,
+      failed: 2,
+      reviewing: 3,
+      reviewed: 4,
+      completed: 5,
+    };
+
+    return [...items].sort((a, b) => {
+      const pa = statusPriority[a.status] ?? 99;
+      const pb = statusPriority[b.status] ?? 99;
+      if (pa !== pb) return pa - pb;
+      return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+    });
   }, [pullRequests, search, statusFilter, linkFilter]);
 
   const statusOptions = useMemo(
@@ -190,7 +257,11 @@ export function PullRequestsTableClient({
 
   if (isLoading && pullRequests.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground">Loading pull requests…</p>
+      <LoadingState
+        label="Loading pull requests"
+        description="Syncing open PRs from your connected repositories."
+        variant="pull-requests"
+      />
     );
   }
 
@@ -207,7 +278,7 @@ export function PullRequestsTableClient({
             PRs from GitHub.
           </EmptyDescription>
         </EmptyHeader>
-        <SyncPullRequestsButton />
+        <SyncPullRequestsButton className="items-center" />
       </Empty>
     );
   }
@@ -260,11 +331,13 @@ export function PullRequestsTableClient({
       {filteredPullRequests.length === 0 ? (
         <p className="text-sm text-muted-foreground">No pull requests match your filters.</p>
       ) : (
-        <div className="max-h-[min(70vh,720px)] overflow-y-auto overflow-x-hidden rounded-lg border">
-          <div className="sticky top-0 z-10 grid grid-cols-[2.75rem_minmax(0,1fr)_10.5rem] gap-x-3 border-b bg-background px-3 py-2 text-xs font-medium text-muted-foreground">
+        <AutoHideScroll
+          className={`${dashboardPanelHeightClass} overflow-y-auto overflow-x-hidden rounded-lg border`}
+        >
+          <div className="sticky top-0 z-10 grid grid-cols-[2.75rem_minmax(0,1fr)_9rem] gap-x-3 border-b bg-background px-3 py-2 text-xs font-medium text-muted-foreground">
             <span>PR</span>
             <span>Change</span>
-            <span>Review</span>
+            <span className="text-right">Review</span>
           </div>
           <div className="divide-y">
             {filteredPullRequests.map((pullRequest) => {
@@ -288,7 +361,7 @@ export function PullRequestsTableClient({
               return (
                 <div
                   key={pullRequest.id}
-                  className="grid grid-cols-[2.75rem_minmax(0,1fr)_10.5rem] items-start gap-x-3 px-3 py-3"
+                  className="grid grid-cols-[2.75rem_minmax(0,1fr)_9rem] items-start gap-x-3 px-3 py-2.5"
                 >
                   <div className="pt-0.5">
                     <span className="inline-flex items-center gap-1 text-sm font-medium">
@@ -301,12 +374,39 @@ export function PullRequestsTableClient({
                     </span>
                   </div>
 
-                  <div className="min-w-0">
+                  <ClickableReviewSection
+                    className="-mx-1 px-1 py-0.5"
+                    title={
+                      pullRequestHasReviewNotes(
+                        pullRequest.reviewComment,
+                        pullRequest.status,
+                      )
+                        ? "View AI review details"
+                        : "View PR details"
+                    }
+                    onClick={() => {
+                      setSelectedPullRequest({
+                        id: pullRequest.id,
+                        title: pullRequest.title,
+                        repoFullName: pullRequest.repoFullName,
+                        prNumber: pullRequest.prNumber,
+                        reviewComment: pullRequest.reviewComment,
+                        status: pullRequest.status,
+                      });
+                      setReviewDialogOpen(true);
+                    }}
+                  >
                     <p
                       className="truncate text-sm font-medium"
                       title={pullRequest.title}
                     >
                       {pullRequest.title}
+                      {pullRequestHasReviewNotes(
+                        pullRequest.reviewComment,
+                        pullRequest.status,
+                      ) ? (
+                        <span className="sr-only"> — click to view review</span>
+                      ) : null}
                     </p>
                     <p
                       className="mt-0.5 truncate text-xs text-muted-foreground"
@@ -335,6 +435,7 @@ export function PullRequestsTableClient({
                         href={`${DASHBOARD_BASE_PATH}/feature-requests/${pullRequest.featureRequest.id}`}
                         className="mt-0.5 block truncate text-xs text-primary hover:underline"
                         title={pullRequest.featureRequest.title}
+                        onClick={(event) => event.stopPropagation()}
                       >
                         {pullRequest.featureRequest.title}
                       </Link>
@@ -343,49 +444,41 @@ export function PullRequestsTableClient({
                         Unlinked
                       </span>
                     )}
-                  </div>
+                  </ClickableReviewSection>
 
-                  <div className="flex min-w-0 flex-col gap-1.5">
+                  <div className="flex min-w-0 flex-col items-end gap-2">
                     <ReviewStatusCell
                       status={pullRequest.status}
                       reviewComment={pullRequest.reviewComment}
                       updatedAt={pullRequest.updatedAt}
+                      confidenceScore={confidenceScore}
                     />
-                    {inFlight ? (
-                      <span className="text-[11px] text-muted-foreground">
-                        Review in progress…
-                      </span>
-                    ) : confidenceScore != null ? (
-                      <span
-                        className="text-[11px] text-muted-foreground"
-                        title={confidenceLabel(confidenceScore)}
-                      >
-                        {confidenceScore}% confidence
-                      </span>
-                    ) : (
-                      <span className="text-[11px] text-muted-foreground">
-                        No review yet
-                      </span>
-                    )}
                     <RunReviewButton
                       pullRequestId={pullRequest.id}
                       status={pullRequest.status}
                       updatedAt={pullRequest.updatedAt}
                       disabled={!reviewConfigured}
+                      compact
                     />
-                    <span
-                      className="text-center text-[11px] text-muted-foreground"
-                      title={new Date(pullRequest.updatedAt).toLocaleString()}
-                    >
-                      {compactUpdatedAt(pullRequest.updatedAt)}
-                    </span>
                   </div>
                 </div>
               );
             })}
           </div>
-        </div>
+        </AutoHideScroll>
       )}
+
+      {selectedPullRequest ? (
+        <PullRequestReviewDialog
+          open={reviewDialogOpen}
+          onOpenChange={setReviewDialogOpen}
+          title={selectedPullRequest.title}
+          repoFullName={selectedPullRequest.repoFullName}
+          prNumber={selectedPullRequest.prNumber}
+          reviewComment={selectedPullRequest.reviewComment}
+          status={selectedPullRequest.status}
+        />
+      ) : null}
     </div>
   );
 }

@@ -1,19 +1,31 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, Plus, X } from "lucide-react";
 import { toast } from "sonner";
 
+import {
+  readLastFeature,
+  clearLastFeature,
+  type LastFeature,
+} from "@/features/shipflow/lib/last-feature";
+
 import { Button } from "@/components/ui/button";
+import { ButtonLoadingLabel } from "@/components/ui/loading-illustration";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   DashboardListFilters,
   filterBySearch,
 } from "@/features/dashboard/components/dashboard-list-filters";
+import {
+  AutoHideScroll,
+  dashboardPanelHeightClass,
+} from "@/components/ui/auto-hide-scroll";
 import { ProjectPicker } from "@/features/dashboard/components/project-picker";
 import { FEATURE_STATUS_LABELS } from "@/features/dashboard/lib/routes";
 import { FeatureStatusBadge } from "@/features/shipflow/components/feature-status-badge";
+import { LoadingState } from "@/components/ui/loading-state";
 import { trpc } from "@/trpc/client";
 
 type FeatureRequestsPageClientProps = {
@@ -27,6 +39,11 @@ export function FeatureRequestsPageClient({
 }: FeatureRequestsPageClientProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [resume, setResume] = useState<LastFeature | null>(null);
+
+  useEffect(() => {
+    setResume(readLastFeature());
+  }, []);
 
   const utils = trpc.useUtils();
   const { data: features = [], isLoading } = trpc.featureRequest.list.useQuery({
@@ -70,6 +87,47 @@ export function FeatureRequestsPageClient({
         </div>
         <ProjectPicker projects={projects} activeProjectId={projectId} />
       </div>
+
+      {resume ? (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              <ArrowRight className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Continue where you left off
+              </p>
+              <p className="truncate text-sm font-medium">
+                {resume.title}
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  {FEATURE_STATUS_LABELS[resume.status] ?? resume.status}
+                </span>
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-1">
+            <Link
+              href={`/dashboard/feature-requests/${resume.id}`}
+              className="inline-flex h-8 items-center gap-1.5 rounded-md bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary/90"
+            >
+              Resume
+              <ArrowRight className="size-3.5" />
+            </Link>
+            <button
+              type="button"
+              aria-label="Dismiss"
+              onClick={() => {
+                clearLastFeature();
+                setResume(null);
+              }}
+              className="inline-flex size-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       <details className="rounded-lg border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-medium">
@@ -130,7 +188,11 @@ export function FeatureRequestsPageClient({
               disabled={createMutation.isPending}
             >
               <Plus className="mr-2 size-4" />
-              {createMutation.isPending ? "Creating…" : "Create request"}
+              {createMutation.isPending ? (
+                <ButtonLoadingLabel>Creating…</ButtonLoadingLabel>
+              ) : (
+                "Create request"
+              )}
             </Button>
           </form>
         </CardContent>
@@ -157,9 +219,16 @@ export function FeatureRequestsPageClient({
         </select>
       </DashboardListFilters>
 
-      <div className="grid max-h-[min(70vh,720px)] gap-3 overflow-auto pr-1">
+      <AutoHideScroll
+        className={`${dashboardPanelHeightClass} grid gap-3 overflow-auto pr-1`}
+      >
         {isLoading ? (
-          <p className="text-sm text-muted-foreground">Loading features…</p>
+          <LoadingState
+            label="Loading feature requests"
+            description="Fetching ideas and workflow status for this project."
+            variant="features"
+            className="py-8"
+          />
         ) : filteredFeatures.length === 0 ? (
           <p className="text-sm text-muted-foreground">
             {features.length === 0
@@ -190,7 +259,7 @@ export function FeatureRequestsPageClient({
             </Link>
           ))
         )}
-      </div>
+      </AutoHideScroll>
     </div>
   );
 }

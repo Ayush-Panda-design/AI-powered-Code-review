@@ -1,9 +1,10 @@
 "use client";
 
-import { Loader2, Play } from "lucide-react";
+import { Play, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { LoadingIllustration } from "@/components/ui/loading-illustration";
 import {
   getStaleProcessingMs,
   isInFlightPrStatus,
@@ -18,6 +19,7 @@ type RunReviewButtonProps = {
   disabled?: boolean;
   label?: string;
   className?: string;
+  compact?: boolean;
 };
 
 function isStaleInFlight(status: string, updatedAt: string) {
@@ -35,9 +37,14 @@ export function RunReviewButton({
   disabled = false,
   label = "Review",
   className,
+  compact = false,
 }: RunReviewButtonProps) {
   const utils = trpc.useUtils();
   const inFlight = isInFlightPrStatus(status) && !isStaleInFlight(status, updatedAt);
+  const isReviewed =
+    status === "reviewed" || status === "completed";
+  const isRetry =
+    status === "failed" || isStaleInFlight(status, updatedAt);
 
   const runReview = trpc.review.runReview.useMutation({
     onSuccess: async (result) => {
@@ -58,23 +65,31 @@ export function RunReviewButton({
     ? "Queuing"
     : inFlight
       ? "Running"
-      : status === "failed" || isStaleInFlight(status, updatedAt)
+      : isRetry
         ? "Retry"
-        : label;
+        : compact && isReviewed
+          ? "Re-run"
+          : label;
 
   return (
     <Button
       type="button"
-      variant="outline"
+      variant={compact && isReviewed && !isRetry ? "ghost" : "outline"}
       size="xs"
       disabled={disabled || runReview.isPending || inFlight}
       onClick={() => runReview.mutate({ pullRequestId })}
-      className={cn("w-full", className)}
+      className={cn(
+        compact ? "h-7 w-fit gap-1.5 px-2 text-xs" : "w-full",
+        compact && isReviewed && !isRetry && "text-muted-foreground hover:text-foreground",
+        className,
+      )}
     >
       {inFlight || runReview.isPending ? (
-        <Loader2 className="animate-spin" />
+        <LoadingIllustration variant="inline" size="sm" />
+      ) : isRetry || (compact && isReviewed) ? (
+        <RotateCcw className="size-3" />
       ) : (
-        <Play />
+        <Play className="size-3" />
       )}
       {buttonLabel}
     </Button>

@@ -8,7 +8,6 @@ import {
   getReviewPipelineConfigErrors,
   isReviewPipelineConfigured,
 } from "@/features/reviews/server/review-config";
-import { syncPullRequestsForInstallation } from "@/features/reviews/server/sync-pull-requests";
 import { queueReviewForPullRequest } from "@/features/reviews/server/trigger-review";
 import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
@@ -24,18 +23,6 @@ export type ReviewActionResult = {
   ok: boolean;
   message: string;
 };
-
-export async function syncPullRequests() {
-  const session = await requireSession();
-  const installation = await getInstallationForUser(session.user.id);
-
-  if (!installation) {
-    throw new Error("GitHub App is not connected.");
-  }
-
-  await syncPullRequestsForInstallation(installation.installationId);
-  revalidatePath(`${DASHBOARD_BASE_PATH}/pull-requests`);
-}
 
 export async function runPullRequestReview(
   pullRequestId: string

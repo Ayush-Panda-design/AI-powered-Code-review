@@ -16,6 +16,11 @@ export type ShipflowPrdEvent = { featureRequestId: string };
 export type ShipflowTasksEvent = { featureRequestId: string };
 export type ShipflowReleaseReadinessEvent = { featureRequestId: string };
 export type ShipflowCodegenEvent = { taskId: string };
+export type GitHubSyncRequestedEvent = {
+  syncRunId: string;
+  installationId: number;
+  workspaceId: string;
+};
 
 export const inngest = new Inngest({
   id: "shipflow-ai",
@@ -60,5 +65,12 @@ export async function sendCodegenJob(taskId: string) {
   return inngest.send({
     name: "shipflow/task.codegen",
     data: { taskId } satisfies ShipflowCodegenEvent,
+  });
+}
+
+export async function sendGitHubSyncJob(data: GitHubSyncRequestedEvent) {
+  return inngest.send({
+    name: "github/sync.requested",
+    data,
   });
 }

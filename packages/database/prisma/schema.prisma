@@ -96,8 +96,32 @@ model Workspace {
   reviewRules         ReviewRule[]
   activityEvents      ActivityEvent[]
   invites             WorkspaceInvite[]
+  syncRuns            SyncRun[]
 
   @@map("workspace")
+}
+
+model SyncRun {
+  id             String    @id @default(cuid())
+  workspaceId    String
+  installationId Int
+  status         String    @default("running")
+  totalRepos     Int       @default(0)
+  completedRepos Int       @default(0)
+  totalPRs       Int       @default(0)
+  completedPRs   Int       @default(0)
+  syncedPRs      Int       @default(0)
+  changedPRs     Int       @default(0)
+  queuedReviews  Int       @default(0)
+  errorMessage   String?   @db.Text
+  startedAt      DateTime  @default(now())
+  finishedAt     DateTime?
+  updatedAt      DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, status])
+  @@map("sync_run")
 }
 
 model WorkspaceMember {

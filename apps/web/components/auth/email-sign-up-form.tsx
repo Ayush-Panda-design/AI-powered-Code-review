@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { Suspense, useState, useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ButtonLoadingLabel } from "@/components/ui/loading-illustration";
 import {
   Field,
   FieldGroup,
@@ -72,7 +73,11 @@ function EmailSignUpFormContent() {
             </p>
           ) : null}
           <Button type="submit" className="w-full" disabled={isPending}>
-            {isPending ? "Creating account…" : "Create account"}
+            {isPending ? (
+              <ButtonLoadingLabel>Creating account…</ButtonLoadingLabel>
+            ) : (
+              "Create account"
+            )}
           </Button>
         </FieldGroup>
       </FieldSet>

@@ -9,7 +9,7 @@ export default async function ReviewHistoryPage() {
   await ensureWorkspaceAction();
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6">
       <div>
         <h1 className="text-2xl font-semibold">Review History</h1>
         <p className="text-sm text-muted-foreground">

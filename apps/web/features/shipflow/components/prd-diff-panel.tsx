@@ -1,5 +1,7 @@
 "use client";
 
+import { AutoHideScroll } from "@/components/ui/auto-hide-scroll";
+
 type PrdDiffPanelProps = {
   aiDraftMarkdown: string | null | undefined;
   currentMarkdown: string;
@@ -35,7 +37,7 @@ export function PrdDiffPanel({ aiDraftMarkdown, currentMarkdown }: PrdDiffPanelP
   return (
     <div className="rounded-lg border p-4 text-sm">
       <p className="mb-2 font-medium">PRD diff (AI draft vs current)</p>
-      <pre className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">
+      <AutoHideScroll className="max-h-64 overflow-auto rounded-md bg-muted p-3 text-xs">
         {changes.map((change, index) => (
           <div
             key={index}
@@ -51,7 +53,7 @@ export function PrdDiffPanel({ aiDraftMarkdown, currentMarkdown }: PrdDiffPanelP
             {change.line}
           </div>
         ))}
-      </pre>
+      </AutoHideScroll>
     </div>
   );
 }

@@ -86,6 +86,22 @@ export const PR_SIZE_CRITICAL_LINES = 5000;
 /** Stale PR threshold (hours without update) */
 export const STALE_PR_HOURS = 48;
 
+/** Mark a background GitHub sync as failed if no progress heartbeat */
+export const SYNC_STALE_MS = 15 * 60 * 1000;
+
+/** Fail syncs that never start processing (e.g. Inngest not running) */
+export const SYNC_NO_PROGRESS_MS = 90 * 1000;
+
+export function getGitHubSyncRepoConcurrency() {
+  const parsed = Number(process.env.GITHUB_SYNC_REPO_CONCURRENCY ?? 12);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 12;
+}
+
+export function getGitHubSyncPrConcurrency() {
+  const parsed = Number(process.env.GITHUB_SYNC_PR_CONCURRENCY ?? 10);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : 10;
+}
+
 export function slugify(value: string) {
   return value
     .toLowerCase()

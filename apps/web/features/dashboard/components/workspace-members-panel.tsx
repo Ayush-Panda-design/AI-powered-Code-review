@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ButtonLoadingLabel } from "@/components/ui/loading-illustration";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { trpc } from "@/trpc/client";
@@ -104,7 +105,11 @@ export function WorkspaceMembersPanel({
             className="max-w-sm"
           />
           <Button type="submit" disabled={inviteMutation.isPending}>
-            {inviteMutation.isPending ? "Inviting…" : "Invite member"}
+            {inviteMutation.isPending ? (
+              <ButtonLoadingLabel>Inviting…</ButtonLoadingLabel>
+            ) : (
+              "Invite member"
+            )}
           </Button>
         </form>
 

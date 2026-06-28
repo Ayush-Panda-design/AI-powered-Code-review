@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "@/features/dashboard/components/dashboard-sidebar";
 import { WorkspaceSwitcher } from "@/features/dashboard/components/workspace-switcher";
+import { AutoHideScroll } from "@/components/ui/auto-hide-scroll";
 import { getDashboardRoute } from "@/features/dashboard/lib/routes";
 import { usePathname } from "next/navigation";
 
@@ -38,7 +39,7 @@ export function DashboardShell({
         workspaces={workspaces}
         activeWorkspaceId={activeWorkspaceId}
       />
-      <SidebarInset>
+      <SidebarInset className="flex max-h-svh min-h-svh flex-col overflow-hidden">
         <header className="flex h-14 shrink-0 items-center gap-2 border-b px-4">
           <SidebarTrigger className="-ml-1" />
           <Separator orientation="vertical" className="mr-2 h-4" />
@@ -54,7 +55,9 @@ export function DashboardShell({
           </div>
           <UserMenu user={user} />
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 md:p-6">{children}</div>
+        <AutoHideScroll className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-6">
+          {children}
+        </AutoHideScroll>
       </SidebarInset>
     </SidebarProvider>
   );

@@ -12,7 +12,7 @@ import {
   EmptyMedia,
   EmptyTitle,
 } from "@/components/ui/empty";
-import { Skeleton } from "@/components/ui/skeleton";
+import { LoadingListRows } from "@/components/ui/loading-state";
 import {
   Table,
   TableBody,
@@ -46,8 +46,10 @@ function formatUpdatedAt(value: string) {
 
 export function ReposList({
   renderActions,
+  onRepoClick,
 }: {
   renderActions?: (repo: GitHubRepo) => React.ReactNode;
+  onRepoClick?: (repo: GitHubRepo) => void;
 }) {
   const sentinelRef = useRef<HTMLDivElement>(null);
 
@@ -89,13 +91,7 @@ export function ReposList({
   const totalCount = data?.pages[0]?.totalCount;
 
   if (isLoading) {
-    return (
-      <div className="space-y-3">
-        {Array.from({ length: 5 }).map((_, index) => (
-          <Skeleton key={index} className="h-12 w-full rounded-lg" />
-        ))}
-      </div>
-    );
+    return <LoadingListRows rows={5} variant="repos" />;
   }
 
   if (error) {
@@ -155,7 +151,20 @@ export function ReposList({
         <TableBody>
           {repos.map((repo) => (
             <TableRow key={repo.id}>
-              <TableCell className="font-medium">{repo.fullName}</TableCell>
+              <TableCell className="font-medium">
+                {onRepoClick ? (
+                  <button
+                    type="button"
+                    onClick={() => onRepoClick(repo)}
+                    className="text-left hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    title="View pull requests and reviews"
+                  >
+                    {repo.fullName}
+                  </button>
+                ) : (
+                  repo.fullName
+                )}
+              </TableCell>
               <TableCell>
                 <Badge
                   variant="outline"
@@ -190,13 +199,7 @@ export function ReposList({
 
       <div ref={sentinelRef} className="h-1" />
 
-      {isFetchingNextPage ? (
-        <div className="space-y-3">
-          {Array.from({ length: 3 }).map((_, index) => (
-            <Skeleton key={index} className="h-10 w-full rounded-lg" />
-          ))}
-        </div>
-      ) : null}
+      {isFetchingNextPage ? <LoadingListRows rows={3} variant="repos" /> : null}
     </div>
   );
 }

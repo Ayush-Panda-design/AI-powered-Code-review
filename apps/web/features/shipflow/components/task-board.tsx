@@ -12,7 +12,12 @@ import {
   DashboardListFilters,
   filterBySearch,
 } from "@/features/dashboard/components/dashboard-list-filters";
+import {
+  AutoHideScroll,
+  dashboardPanelHeightClass,
+} from "@/components/ui/auto-hide-scroll";
 import { FeatureStatusBadge } from "@/features/shipflow/components/feature-status-badge";
+import { LoadingState } from "@/components/ui/loading-state";
 import { trpc } from "@/trpc/client";
 import { cn } from "@/lib/utils";
 
@@ -71,10 +76,6 @@ export function TaskBoard({ projectId }: TaskBoardProps) {
     onError: (error) => toast.error(error.message),
   });
 
-  if (isLoading) {
-    return <p className="text-sm text-muted-foreground">Loading tasks…</p>;
-  }
-
   const filteredTasks = useMemo(() => {
     let items = filterBySearch(tasks, search, (task) =>
       [
@@ -92,6 +93,16 @@ export function TaskBoard({ projectId }: TaskBoardProps) {
 
     return items;
   }, [tasks, search, columnFilter]);
+
+  if (isLoading) {
+    return (
+      <LoadingState
+        label="Loading task board"
+        description="Organizing engineering tasks from your approved PRDs."
+        variant="tasks"
+      />
+    );
+  }
 
   const sameFeatureTasks = (taskId: string, featureId: string) =>
     filteredTasks.filter(
@@ -130,7 +141,9 @@ export function TaskBoard({ projectId }: TaskBoardProps) {
         Move tasks between columns, merge related tasks, or split one task into
         subtasks.
       </p>
-      <div className="grid max-h-[min(70vh,720px)] gap-4 overflow-auto md:grid-cols-3">
+      <AutoHideScroll
+        className={`${dashboardPanelHeightClass} grid gap-4 overflow-auto md:grid-cols-3`}
+      >
         {visibleColumns.map((column) => (
           <Card key={column.key}>
             <CardHeader>
@@ -319,7 +332,7 @@ export function TaskBoard({ projectId }: TaskBoardProps) {
             </CardContent>
           </Card>
         ))}
-      </div>
+      </AutoHideScroll>
     </div>
   );
 }

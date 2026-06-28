@@ -14,3 +14,4 @@ export * from "./pull-request";
 export * from "./activity";
 export * from "./review-rules";
 export * from "./review";
+export * from "./sync-run";

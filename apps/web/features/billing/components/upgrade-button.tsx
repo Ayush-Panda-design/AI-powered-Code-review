@@ -6,6 +6,7 @@ import Script from "next/script";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ButtonLoadingLabel } from "@/components/ui/loading-illustration";
 
 type RazorpayConstructor = new (options: Record<string, unknown>) => {
   open: () => void;
@@ -119,7 +120,11 @@ export function UpgradeButton({
           onClick={handleUpgrade}
           disabled={disabled || loading}
         >
-          {loading ? "Opening checkout…" : "Upgrade with Razorpay"}
+          {loading ? (
+            <ButtonLoadingLabel>Opening checkout…</ButtonLoadingLabel>
+          ) : (
+            "Upgrade with Razorpay"
+          )}
         </Button>
         {error && <p className="text-xs text-destructive">{error}</p>}
       </div>
