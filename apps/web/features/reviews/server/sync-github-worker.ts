@@ -232,11 +232,9 @@ async function syncRepoWithOctokit(input: {
     changedPRs.map((pr) =>
       prLimit(async () => {
         const existing = existingByNumber.get(pr.number);
+        // Changed PRs (new or new commits) should re-queue unless already running.
         const shouldQueue =
-          input.canQueueReviews &&
-          (!existing ||
-            existing.status === "pending" ||
-            existing.status === "failed");
+          input.canQueueReviews && existing?.status !== "processing";
 
         const link = await resolveFeatureLink({
           repoFullName: input.repoFullName,
@@ -294,6 +292,8 @@ async function syncRepoWithOctokit(input: {
             authorLogin: pr.user?.login ?? "unknown",
             headSha: pr.head.sha,
             baseBranch: pr.base.ref,
+            status: "pending",
+            reviewedAt: null,
             ...(link.featureRequestId
               ? { featureRequestId: link.featureRequestId }
               : {}),

@@ -2,12 +2,10 @@ import { inngest, type GitHubSyncRequestedEvent } from "@/features/inngest/clien
 import {
   completeSyncRun,
   failSyncRun,
+  listConnectedRepositoriesForWorkspace,
   touchSyncRun,
 } from "@repo/services";
-import {
-  listInstallationRepositories,
-  syncAllRepositories,
-} from "@/features/reviews/server/sync-github-worker";
+import { syncAllRepositories } from "@/features/reviews/server/sync-github-worker";
 
 export const syncGitHubPullRequests = inngest.createFunction(
   {
@@ -15,18 +13,30 @@ export const syncGitHubPullRequests = inngest.createFunction(
     triggers: [{ event: "github/sync.requested" }],
   },
   async ({ event, step }) => {
-    const { syncRunId, installationId } =
+    const { syncRunId, installationId, workspaceId } =
       event.data as GitHubSyncRequestedEvent;
 
     try {
-      // Step 1 — list repos (fast, single API call)
       const repositories = await step.run("list-repositories", async () => {
-        const repos = await listInstallationRepositories(installationId);
+        const connected = await listConnectedRepositoriesForWorkspace(workspaceId);
+        const repoNames = [...new Set(connected.map((repo) => repo.repoFullName))];
+        const repos = repoNames.map((full_name) => ({ full_name }));
         await touchSyncRun(syncRunId, { totalRepos: repos.length });
         return repos;
       });
 
-      // Step 2 — sync all repos in parallel (single step, shared octokit)
+      if (repositories.length === 0) {
+        await step.run("complete-sync", async () => {
+          await completeSyncRun(syncRunId, {
+            syncedPRs: 0,
+            changedPRs: 0,
+            queuedReviews: 0,
+          });
+        });
+        return { syncRunId, syncedPRs: 0, changedPRs: 0, queuedReviews: 0 };
+      }
+
+      // Step 2 — sync connected repos in parallel (single step, shared octokit)
       const result = await step.run("sync-all-repos", async () => {
         return syncAllRepositories({
           installationId,

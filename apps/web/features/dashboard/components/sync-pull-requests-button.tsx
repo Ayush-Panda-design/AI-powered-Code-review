@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, RefreshCw, XCircle } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { LoadingIllustration } from "@/components/ui/loading-illustration";
@@ -22,8 +23,22 @@ type SyncStatus = {
   message: string | null;
 };
 
-/** Expected time for a full sync — used to pace the client-side animation. */
-const EXPECTED_SYNC_MS = 20_000;
+/** Connected-repo sync is usually quick — pace the bar for ~6s max. */
+const EXPECTED_SYNC_MS = 6_000;
+
+const STARTING_SYNC_STATUS: SyncStatus = {
+  id: "__starting__",
+  status: "running",
+  totalRepos: 0,
+  completedRepos: 0,
+  totalPRs: 0,
+  completedPRs: 0,
+  syncedPRs: 0,
+  changedPRs: 0,
+  queuedReviews: 0,
+  errorMessage: null,
+  message: "Connecting to GitHub…",
+};
 
 function friendlySyncError(raw?: string | null) {
   if (raw && /timed out/i.test(raw)) {
@@ -42,15 +57,14 @@ function friendlySyncError(raw?: string | null) {
 }
 
 function formatRunningText(status: SyncStatus) {
-  if (status.totalRepos === 0) {
-    return "Starting sync…";
+  if (status.id === "__starting__" || status.totalRepos === 0) {
+    return status.message ?? "Fetching open pull requests…";
   }
   if (status.completedRepos === 0) {
-    return `Checking ${status.totalRepos} repos…`;
+    return `Syncing ${status.totalRepos} connected ${status.totalRepos === 1 ? "repo" : "repos"}…`;
   }
   if (status.completedRepos < status.totalRepos) {
-    const remaining = status.totalRepos - status.completedRepos;
-    return `${status.completedRepos} of ${status.totalRepos} repos done · ${remaining} remaining`;
+    return `${status.completedRepos} of ${status.totalRepos} repos synced…`;
   }
   return "Wrapping up…";
 }
@@ -108,21 +122,16 @@ function SyncProgressPanel({
       {isRunning ? (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs text-muted-foreground">GitHub sync</span>
+            <span className="text-xs text-muted-foreground">Connected repos</span>
             <span className="text-xs tabular-nums text-muted-foreground">
               {displayPercent}%
             </span>
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-            {/* Indeterminate sweep when we don't have real repo count yet */}
-            {status.totalRepos === 0 ? (
-              <div className="h-full w-1/3 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 animate-[sweep_1.4s_ease-in-out_infinite]" />
-            ) : (
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-700 ease-out"
-                style={{ width: `${displayPercent}%` }}
-              />
-            )}
+            <div
+              className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500 transition-all duration-500 ease-out"
+              style={{ width: `${displayPercent}%` }}
+            />
           </div>
         </div>
       ) : null}
@@ -136,74 +145,82 @@ export function SyncPullRequestsButton({
   className?: string;
 }) {
   const utils = trpc.useUtils();
-  const [syncId, setSyncId] = useState<string | null>(null);
+  const [panelStatus, setPanelStatus] = useState<SyncStatus | null>(null);
   const [dismissedId, setDismissedId] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [displayPercent, setDisplayPercent] = useState(0);
   const syncStartRef = useRef<number | null>(null);
+  const syncInFlightRef = useRef(false);
 
-  const { data: activeSync } = trpc.review.getActiveSync.useQuery(undefined, {
-    refetchOnWindowFocus: true,
-  });
-
-  useEffect(() => {
-    if (activeSync?.active && !syncId) {
-      setSyncId(activeSync.status.id);
+  const runSync = async () => {
+    if (syncInFlightRef.current) {
+      return;
     }
-  }, [activeSync, syncId]);
+    syncInFlightRef.current = true;
+    setDismissedId(null);
+    setIsSyncing(true);
+    setPanelStatus(STARTING_SYNC_STATUS);
+    setDisplayPercent(4);
+    syncStartRef.current = Date.now();
 
-  const { data: syncStatus } = trpc.review.getSyncStatus.useQuery(
-    { syncId: syncId ?? "" },
-    {
-      enabled: Boolean(syncId),
-      // Poll quickly while running so we catch intermediate updates
-      refetchInterval: (query) =>
-        query.state.data?.status === "running" ? 600 : false,
-    },
-  );
+    try {
+      const response = await fetch("/api/github/sync", { method: "POST" });
+      const body = (await response.json().catch(() => null)) as {
+        ok?: boolean;
+        status?: SyncStatus;
+        error?: string;
+      } | null;
 
-  const startSync = trpc.review.startSync.useMutation({
-    onSuccess: (result) => {
-      setSyncId(result.syncId);
-      setDismissedId(null);
-      void utils.review.getActiveSync.invalidate();
-    },
-  });
+      if (!response.ok || !body?.status) {
+        throw new Error(body?.error ?? "Sync failed");
+      }
 
-  // Derive whether we're in an active sync (either pending mutation or running job)
-  const isRunning =
-    startSync.isPending || syncStatus?.status === "running";
+      setPanelStatus(body.status);
+      setDisplayPercent(body.status.status === "completed" ? 100 : 0);
 
-  // The status object shown in the panel — visible immediately on button click
-  const panelStatus: SyncStatus | null =
-    syncStatus ??
-    (startSync.isPending
-      ? {
-          id: "pending",
-          status: "running",
-          totalRepos: 0,
-          completedRepos: 0,
-          totalPRs: 0,
-          completedPRs: 0,
-          syncedPRs: 0,
-          changedPRs: 0,
-          queuedReviews: 0,
-          errorMessage: null,
-          message: null,
+      if (body.status.status === "completed") {
+        void utils.review.list.invalidate();
+        void utils.review.getActiveSync.invalidate();
+        if (body.status.message) {
+          toast.success(body.status.message);
         }
-      : null);
+      } else if (body.status.status === "failed") {
+        toast.error(friendlySyncError(body.status.errorMessage));
+      }
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Sync failed unexpectedly.";
+      setPanelStatus({
+        id: "__failed__",
+        status: "failed",
+        totalRepos: 0,
+        completedRepos: 0,
+        totalPRs: 0,
+        completedPRs: 0,
+        syncedPRs: 0,
+        changedPRs: 0,
+        queuedReviews: 0,
+        errorMessage: message,
+        message: friendlySyncError(message),
+      });
+      toast.error(friendlySyncError(message));
+    } finally {
+      syncInFlightRef.current = false;
+      setIsSyncing(false);
+    }
+  };
 
   const showPanel =
     panelStatus !== null && panelStatus.id !== dismissedId;
 
-  // Smooth progress animation — updates every 200 ms
   useEffect(() => {
-    if (!isRunning) {
-      if (syncStatus?.status === "completed") {
+    if (!isSyncing) {
+      if (panelStatus?.status === "completed") {
         setDisplayPercent(100);
-      } else if (!syncStatus) {
-        setDisplayPercent(0);
       }
-      syncStartRef.current = null;
+      if (panelStatus?.status !== "running") {
+        syncStartRef.current = null;
+      }
       return;
     }
 
@@ -213,44 +230,24 @@ export function SyncPullRequestsButton({
 
     const tick = () => {
       const elapsed = Date.now() - (syncStartRef.current ?? Date.now());
-      // Time-based estimate: 0 → 90% over EXPECTED_SYNC_MS
-      const timePct = Math.min(90, (elapsed / EXPECTED_SYNC_MS) * 90);
-      // Real data from DB (only meaningful once totalRepos is set)
-      const realPct =
-        syncStatus && syncStatus.totalRepos > 0
-          ? Math.round((syncStatus.completedRepos / syncStatus.totalRepos) * 100)
-          : 0;
-      // Use whichever is higher so the bar never goes backward
-      const next = Math.round(Math.max(timePct, realPct));
-      setDisplayPercent((prev) => Math.max(prev, next));
+      const timePct = Math.min(92, (elapsed / EXPECTED_SYNC_MS) * 92);
+      setDisplayPercent((prev) => Math.max(prev, Math.round(timePct)));
     };
 
-    tick(); // immediate call so bar moves on first render
-    const id = setInterval(tick, 200);
+    tick();
+    const id = setInterval(tick, 150);
     return () => clearInterval(id);
-  }, [isRunning, syncStatus]);
-
-  // Refresh PR list when sync completes
-  useEffect(() => {
-    if (syncStatus?.status === "completed") {
-      void utils.review.list.invalidate();
-      void utils.review.getActiveSync.invalidate();
-    }
-  }, [syncStatus?.status, utils.review.list, utils.review.getActiveSync]);
+  }, [isSyncing, panelStatus?.status]);
 
   return (
     <div className={cn("flex flex-col items-end gap-3", className)}>
       <Button
         type="button"
         variant="outline"
-        disabled={isRunning}
-        onClick={() => {
-          setDisplayPercent(0);
-          syncStartRef.current = null;
-          startSync.mutate();
-        }}
+        disabled={isSyncing}
+        onClick={() => void runSync()}
       >
-        {isRunning ? (
+        {isSyncing ? (
           <LoadingIllustration variant="inline" size="sm" label="Syncing" />
         ) : (
           <RefreshCw />
@@ -258,7 +255,7 @@ export function SyncPullRequestsButton({
         Sync from GitHub
       </Button>
 
-      {showPanel ? (
+      {showPanel && panelStatus ? (
         <div className="flex w-full flex-col items-end gap-2">
           <SyncProgressPanel
             status={panelStatus}
@@ -276,12 +273,6 @@ export function SyncPullRequestsButton({
             </Button>
           ) : null}
         </div>
-      ) : null}
-
-      {startSync.error ? (
-        <p className="max-w-md text-right text-xs text-destructive">
-          {friendlySyncError(startSync.error.message)}
-        </p>
       ) : null}
     </div>
   );

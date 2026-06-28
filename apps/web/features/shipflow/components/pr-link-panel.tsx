@@ -95,7 +95,7 @@ export function PrLinkPanel({
 }: PrLinkPanelProps) {
   const [selectedPrId, setSelectedPrId] = useState<string>("");
   const [isSyncing, setIsSyncing] = useState(false);
-  const autoSyncedRef = useRef(false);
+  const syncInFlightRef = useRef(false);
   const utils = trpc.useUtils();
 
   const { data, isLoading } = trpc.featureRequest.listLinkablePullRequests.useQuery(
@@ -113,7 +113,15 @@ export function PrLinkPanel({
 
   const runSync = useCallback(
     async (options?: { silent?: boolean }) => {
+      if (syncInFlightRef.current) {
+        return;
+      }
+      syncInFlightRef.current = true;
       setIsSyncing(true);
+      const toastId = `sync-feature-${featureRequestId}`;
+      if (!options?.silent) {
+        toast.loading("Connecting to GitHub…", { id: toastId });
+      }
       try {
         const response = await fetch("/api/github/sync-feature", {
           method: "POST",
@@ -124,6 +132,7 @@ export function PrLinkPanel({
         const result = (await response.json().catch(() => null)) as {
           ok?: boolean;
           changed?: number;
+          synced?: number;
           repos?: number;
           error?: string;
         } | null;
@@ -132,11 +141,15 @@ export function PrLinkPanel({
           throw new Error(result?.error ?? "Sync failed");
         }
 
-        await utils.featureRequest.listLinkablePullRequests.invalidate({
-          featureRequestId,
-        });
+        await Promise.all([
+          utils.featureRequest.listLinkablePullRequests.invalidate({
+            featureRequestId,
+          }),
+          onUpdated(),
+        ]);
 
         if (!options?.silent) {
+          toast.dismiss(toastId);
           if ((result.repos ?? 0) === 0) {
             toast.info("No connected repos to sync for this feature's project.");
           } else if ((result.changed ?? 0) > 0) {
@@ -147,23 +160,30 @@ export function PrLinkPanel({
         }
       } catch (error) {
         if (!options?.silent) {
+          toast.dismiss(toastId);
           toast.error(
             error instanceof Error ? error.message : "Failed to sync from GitHub",
           );
         }
       } finally {
+        syncInFlightRef.current = false;
         setIsSyncing(false);
       }
     },
-    [featureRequestId, utils],
+    [featureRequestId, onUpdated, utils],
   );
 
-  // Auto-sync once on mount so freshly opened PRs appear without manual action.
+  // One silent sync per browser session (survives React Strict Mode remounts).
   useEffect(() => {
-    if (autoSyncedRef.current) return;
-    autoSyncedRef.current = true;
+    const key = `shipflow:auto-sync:${featureRequestId}`;
+    if (typeof window !== "undefined" && sessionStorage.getItem(key)) {
+      return;
+    }
+    if (typeof window !== "undefined") {
+      sessionStorage.setItem(key, "1");
+    }
     void runSync({ silent: true });
-  }, [runSync]);
+  }, [featureRequestId, runSync]);
 
   const linkMutation = trpc.featureRequest.linkPullRequest.useMutation({
     onSuccess: async (result) => {
@@ -212,6 +232,22 @@ export function PrLinkPanel({
           {isSyncing ? "Syncing…" : "Sync from GitHub"}
         </Button>
       </CardHeader>
+      {isSyncing ? (
+        <div className="mx-6 mb-2 flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+          <LoadingIllustration variant="repos" size="sm" label="Syncing" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
+              Syncing with GitHub…
+            </p>
+            <p className="text-[11px] text-muted-foreground">
+              Fetching open pull requests from your connected repos
+            </p>
+            <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted">
+              <div className="h-full w-1/3 animate-[sweep_1.4s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-amber-500 to-orange-500" />
+            </div>
+          </div>
+        </div>
+      ) : null}
       <CardContent className="space-y-4">
         {linkedPullRequests.length > 0 ? (
           <div className="space-y-2">
