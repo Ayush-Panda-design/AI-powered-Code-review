@@ -124,6 +124,10 @@ export function TaskBoard({ projectId, fromFeatureId }: TaskBoardProps) {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   useEffect(() => {
+    setFeatureFilter(fromFeatureId ?? "all");
+  }, [fromFeatureId]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     setGuideOpen(window.localStorage.getItem(GUIDE_KEY) !== "0");
   }, []);
@@ -149,7 +153,7 @@ export function TaskBoard({ projectId, fromFeatureId }: TaskBoardProps) {
     },
   );
 
-  const { data: features = [] } = trpc.featureRequest.list.useQuery(
+  const { data: features = [], isLoading: isLoadingFeatures } = trpc.featureRequest.list.useQuery(
     { projectId },
     { staleTime: 60_000 },
   );
@@ -238,14 +242,21 @@ export function TaskBoard({ projectId, fromFeatureId }: TaskBoardProps) {
     return items;
   }, [tasks, search, columnFilter, featureFilter, hideShipped]);
 
+  const isBoardLoading = isLoading || isLoadingFeatures;
+
   const featureTasks = fromFeatureId
     ? tasks.filter((t) => t.featureRequest.id === fromFeatureId)
     : tasks;
-  const waitingForTasks = Boolean(fromFeatureId) && !isLoading && featureTasks.length === 0;
+  const waitingForTasks =
+    Boolean(fromFeatureId) && !isBoardLoading && featureTasks.length === 0;
 
-  if (isLoading) {
+  if (isBoardLoading) {
     return (
-      <LoadingState label="Loading task board" description="Organizing engineering tasks from your approved PRDs." variant="tasks" />
+      <LoadingState
+        label="Loading task board"
+        description="Organizing engineering tasks from your approved PRDs."
+        variant="tasks"
+      />
     );
   }
 
