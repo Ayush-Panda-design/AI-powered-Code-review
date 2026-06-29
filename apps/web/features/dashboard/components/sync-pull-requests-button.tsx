@@ -9,7 +9,7 @@ import { LoadingIllustration } from "@/components/ui/loading-illustration";
 import { trpc } from "@/trpc/client";
 import { cn } from "@/lib/utils";
 import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
-import { friendlySyncError } from "@repo/services";
+import { friendlySyncError } from "@repo/services/sync-errors";
 
 type SyncStatus = {
   id: string;
