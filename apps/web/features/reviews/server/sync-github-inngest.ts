@@ -5,7 +5,7 @@ import {
   listConnectedRepositoriesForWorkspace,
   touchSyncRun,
 } from "@repo/services";
-import { syncAllRepositories } from "@/features/reviews/server/sync-github-worker";
+import { syncConnectedRepositories } from "@/features/reviews/server/sync-github-worker";
 
 export const syncGitHubPullRequests = inngest.createFunction(
   {
@@ -19,8 +19,17 @@ export const syncGitHubPullRequests = inngest.createFunction(
     try {
       const repositories = await step.run("list-repositories", async () => {
         const connected = await listConnectedRepositoriesForWorkspace(workspaceId);
-        const repoNames = [...new Set(connected.map((repo) => repo.repoFullName))];
-        const repos = repoNames.map((full_name) => ({ full_name }));
+        const repoByName = new Map<
+          string,
+          { full_name: string; installationId: number }
+        >();
+        for (const repo of connected) {
+          repoByName.set(repo.repoFullName, {
+            full_name: repo.repoFullName,
+            installationId: repo.installationId,
+          });
+        }
+        const repos = [...repoByName.values()];
         await touchSyncRun(syncRunId, { totalRepos: repos.length });
         return repos;
       });
@@ -38,11 +47,7 @@ export const syncGitHubPullRequests = inngest.createFunction(
 
       // Step 2 — sync connected repos in parallel (single step, shared octokit)
       const result = await step.run("sync-all-repos", async () => {
-        return syncAllRepositories({
-          installationId,
-          repositories,
-          syncRunId,
-        });
+        return syncConnectedRepositories(repositories, syncRunId);
       });
 
       if (

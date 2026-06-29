@@ -5,6 +5,7 @@ import {
   listKanbanTasks,
   mergeTasks,
   sendCodegenJob,
+  sendOpenDraftPrJob,
   splitTask,
   updateTaskStatus,
 } from "@repo/services";
@@ -163,10 +164,10 @@ export const taskRouter = router({
         });
       }
 
-      if (task.codeGenStatus === "generating" || task.codeGenStatus === "draft_pr_open") {
+      if (task.codeGenStatus === "generating") {
         throw new TRPCError({
           code: "CONFLICT",
-          message: "Codegen already in progress or draft PR exists for this task.",
+          message: "Generation is already in progress for this task. Wait for it to finish or reset the task first.",
         });
       }
 
@@ -190,7 +191,129 @@ export const taskRouter = router({
 
       return {
         ok: true,
-        message: "Codegen queued — a draft PR will open and auto-review.",
+        message: "AI codegen queued — review with View code when ready, or keep coding in your IDE.",
       };
+    }),
+
+  triggerDraftPr: protectedProcedure
+    .input(z.object({ taskId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const task = await prisma.task.findFirst({
+        where: {
+          id: input.taskId,
+          featureRequest: {
+            project: {
+              workspace: { members: { some: { userId: ctx.userId } } },
+            },
+          },
+        },
+        include: {
+          featureRequest: {
+            include: {
+              prd: true,
+              project: { select: { workspaceId: true, repositories: true } },
+              targetRepository: true,
+            },
+          },
+        },
+      });
+
+      if (!task) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      if (!task.generatedCode || !task.generatedFilePath) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Generate code first, then open a draft PR.",
+        });
+      }
+
+      if (task.codeGenStatus === "generating") {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "A job is already in progress for this task. Wait for it to finish.",
+        });
+      }
+
+      if (task.draftPrUrl) {
+        throw new TRPCError({
+          code: "CONFLICT",
+          message: "This task already has a linked draft PR.",
+        });
+      }
+
+      const repo =
+        task.featureRequest.targetRepository ??
+        task.featureRequest.project.repositories[0];
+
+      if (!repo) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Connect a repository before opening a draft PR.",
+        });
+      }
+
+      await sendOpenDraftPrJob(task.id);
+
+      return {
+        ok: true,
+        message: "Opening draft PR on GitHub…",
+      };
+    }),
+
+  deleteTask: protectedProcedure
+    .input(z.object({ taskId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const task = await prisma.task.findFirst({
+        where: {
+          id: input.taskId,
+          featureRequest: {
+            project: {
+              workspace: { members: { some: { userId: ctx.userId } } },
+            },
+          },
+        },
+      });
+      if (!task) throw new TRPCError({ code: "NOT_FOUND" });
+      await prisma.task.delete({ where: { id: input.taskId } });
+      return { ok: true };
+    }),
+
+  /**
+   * Reset a task that is stuck in "generating" back to "none" so the user can
+   * retry. This happens when the Inngest worker crashes / restarts mid-job and
+   * the task never gets its final status update.
+   */
+  resetCodegen: protectedProcedure
+    .input(z.object({ taskId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const task = await prisma.task.findFirst({
+        where: {
+          id: input.taskId,
+          featureRequest: {
+            project: {
+              workspace: { members: { some: { userId: ctx.userId } } },
+            },
+          },
+        },
+      });
+
+      if (!task) {
+        throw new TRPCError({ code: "NOT_FOUND" });
+      }
+
+      const hasSavedCode = Boolean(task.generatedCode);
+
+      await prisma.task.update({
+        where: { id: input.taskId },
+        data: {
+          codeGenStatus: hasSavedCode ? "code_ready" : "none",
+          codeGenStage: null,
+          codeGenError: null,
+        },
+      });
+
+      return { ok: true };
     }),
 });

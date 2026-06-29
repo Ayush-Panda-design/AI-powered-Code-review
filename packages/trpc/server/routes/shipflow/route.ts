@@ -5,7 +5,7 @@ import {
   resolveWorkspaceIdForFeature,
   sendClarifyJob,
   sendPrdJob,
-  sendTasksJob,
+  updateFeatureStatus,
 } from "@repo/services";
 import { AI_CREDIT_COSTS } from "@repo/services/constants";
 import { TRPCError } from "@trpc/server";
@@ -94,10 +94,12 @@ export const shipflowRouter = router({
         });
       }
 
-      if (feature.status !== "prd_ready") {
+      // Allow retrying from "planning" (stuck from failed/lost Inngest job)
+      // as well as the normal "prd_ready" state.
+      if (feature.status !== "prd_ready" && feature.status !== "planning") {
         throw new TRPCError({
           code: "PRECONDITION_FAILED",
-          message: "Feature must be in PRD Ready status to generate tasks.",
+          message: `Cannot generate tasks in status "${feature.status}". PRD must be approved first.`,
         });
       }
 
@@ -105,7 +107,26 @@ export const shipflowRouter = router({
         input.featureRequestId,
         AI_CREDIT_COSTS.tasks,
       );
-      await sendTasksJob(input.featureRequestId);
+
+      // Reset status to prd_ready so the direct API route can run cleanly.
+      // The actual generation is done by POST /api/shipflow/generate-tasks
+      // which runs synchronously (no Inngest needed for a single AI call).
+      if (feature.status === "planning") {
+        await updateFeatureStatus(input.featureRequestId, "prd_ready");
+      }
+
+      return { ok: true, runDirect: true };
+    }),
+
+  /** Reset a feature stuck in "planning" so tasks can be regenerated. */
+  resetPlanning: protectedProcedure
+    .input(z.object({ featureRequestId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      const feature = await assertFeatureAccess(input.featureRequestId, ctx.userId);
+      if (feature.status !== "planning") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Feature is not stuck in planning." });
+      }
+      await updateFeatureStatus(input.featureRequestId, "prd_ready");
       return { ok: true };
     }),
 

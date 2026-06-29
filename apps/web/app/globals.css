@@ -301,6 +301,18 @@
     }
   }
 
+  @keyframes task-gen-slide {
+    0% {
+      transform: translateX(-100%);
+    }
+    60% {
+      transform: translateX(300%);
+    }
+    100% {
+      transform: translateX(300%);
+    }
+  }
+
   @keyframes sweep {
     0% {
       transform: translateX(-100%);

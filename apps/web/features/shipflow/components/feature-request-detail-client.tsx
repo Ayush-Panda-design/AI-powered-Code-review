@@ -14,14 +14,17 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
+import { CollapsibleCard } from "@/features/shipflow/components/collapsible-card";
 import { AiReviewPanel } from "@/features/reviews/components/ai-review-panel";
 import { FeatureStatusBadge } from "@/features/shipflow/components/feature-status-badge";
 import { PrLinkPanel } from "@/features/shipflow/components/pr-link-panel";
+import { FeatureTargetRepoPicker } from "@/features/shipflow/components/feature-target-repo-picker";
 import {
   ApprovalHistory,
   ReleaseApprovalPanel,
 } from "@/features/shipflow/components/release-approval-panel";
 import { PrdDiffPanel } from "@/features/shipflow/components/prd-diff-panel";
+import { TaskGenerationProgress } from "@/features/shipflow/components/task-generation-progress";
 import { WorkflowStepper } from "@/features/shipflow/components/workflow-stepper";
 import { LoadingState } from "@/components/ui/loading-state";
 import { ButtonLoadingLabel, LoadingIllustration } from "@/components/ui/loading-illustration";
@@ -133,9 +136,36 @@ export function FeatureRequestDetailClient({
   const prdMutation = trpc.shipflow.triggerPrd.useMutation(
     aiMutationHandlers("Generate PRD", AI_CREDIT_COSTS.prd),
   );
-  const tasksMutation = trpc.shipflow.triggerTasks.useMutation(
-    aiMutationHandlers("Generate tasks", AI_CREDIT_COSTS.tasks),
-  );
+
+  const [isGeneratingTasks, setIsGeneratingTasks] = useState(false);
+
+  // Direct API — one round-trip, no Inngest / extra tRPC status reset.
+  const runTasksDirectly = async () => {
+    setIsGeneratingTasks(true);
+    const toastId = `tasks-${featureId}`;
+    toast.loading(`Generating tasks… (${AI_CREDIT_COSTS.tasks} credits)`, { id: toastId });
+    try {
+      const res = await fetch("/api/shipflow/generate-tasks", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ featureRequestId: featureId }),
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { ok?: boolean; count?: number; error?: string } | null;
+      if (!res.ok || !data?.ok) {
+        throw new Error(data?.error ?? "We couldn't generate tasks. Please try again.");
+      }
+      toast.success(`${data.count ?? ""} tasks generated — go to the Task Board!`, { id: toastId });
+      await invalidate();
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "We couldn't generate tasks. Please try again.",
+        { id: toastId },
+      );
+    } finally {
+      setIsGeneratingTasks(false);
+    }
+  };
 
   const approvePrdMutation = trpc.shipflow.approvePrd.useMutation({
     onSuccess: async () => {
@@ -198,8 +228,11 @@ export function FeatureRequestDetailClient({
     );
   }
 
+  const hasTasks = feature.tasks.length > 0;
+  const tasksUrl = `/dashboard/tasks?featureId=${featureId}&project=${feature.projectId}`;
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Link
@@ -229,18 +262,11 @@ export function FeatureRequestDetailClient({
             title={creditAffordance(AI_CREDIT_COSTS.clarify).hint}
             onClick={() => {
               const { canAfford, hint } = creditAffordance(AI_CREDIT_COSTS.clarify);
-              if (!canAfford) {
-                toast.error(hint);
-                return;
-              }
+              if (!canAfford) { toast.error(hint); return; }
               clarifyMutation.mutate({ featureRequestId: featureId });
             }}
           >
-            {clarifyMutation.isPending ? (
-              <ButtonLoadingLabel>Starting…</ButtonLoadingLabel>
-            ) : (
-              `AI clarify (${AI_CREDIT_COSTS.clarify} cr)`
-            )}
+            {clarifyMutation.isPending ? <ButtonLoadingLabel>Starting…</ButtonLoadingLabel> : `AI clarify (${AI_CREDIT_COSTS.clarify} cr)`}
           </Button>
           <Button
             variant="outline"
@@ -249,43 +275,36 @@ export function FeatureRequestDetailClient({
             title={creditAffordance(AI_CREDIT_COSTS.prd).hint}
             onClick={() => {
               const { canAfford, hint } = creditAffordance(AI_CREDIT_COSTS.prd);
-              if (!canAfford) {
-                toast.error(hint);
-                return;
-              }
+              if (!canAfford) { toast.error(hint); return; }
               prdMutation.mutate({ featureRequestId: featureId });
             }}
           >
-            {prdMutation.isPending ? (
-              <ButtonLoadingLabel>Starting…</ButtonLoadingLabel>
-            ) : (
-              `Generate PRD (${AI_CREDIT_COSTS.prd} cr)`
-            )}
+            {prdMutation.isPending ? <ButtonLoadingLabel>Starting…</ButtonLoadingLabel> : `Generate PRD (${AI_CREDIT_COSTS.prd} cr)`}
           </Button>
           <Button
             variant="outline"
             size="sm"
-            disabled={inFlight || tasksMutation.isPending || !canGenerateTasks}
-            title={
-              canGenerateTasks
-                ? creditAffordance(AI_CREDIT_COSTS.tasks).hint
-                : "Approve the PRD before generating tasks"
-            }
+            disabled={isGeneratingTasks || (!canGenerateTasks && feature.status !== "planning")}
+            title={canGenerateTasks || feature.status === "planning" ? creditAffordance(AI_CREDIT_COSTS.tasks).hint : "Approve the PRD before generating tasks"}
             onClick={() => {
               const { canAfford, hint } = creditAffordance(AI_CREDIT_COSTS.tasks);
-              if (!canAfford) {
-                toast.error(hint);
-                return;
-              }
-              tasksMutation.mutate({ featureRequestId: featureId });
+              if (!canAfford) { toast.error(hint); return; }
+              void runTasksDirectly();
             }}
           >
-            {tasksMutation.isPending ? (
-              <ButtonLoadingLabel>Starting…</ButtonLoadingLabel>
-            ) : (
-              `Generate tasks (${AI_CREDIT_COSTS.tasks} cr)`
-            )}
+            {isGeneratingTasks
+              ? <ButtonLoadingLabel>Generating…</ButtonLoadingLabel>
+              : feature.status === "planning"
+                ? "Retry generate tasks"
+                : `Generate tasks (${AI_CREDIT_COSTS.tasks} cr)`}
           </Button>
+          {hasTasks && (
+            <Link href={tasksUrl}>
+              <Button size="sm" variant="default">
+                Go to Task Board →
+              </Button>
+            </Link>
+          )}
         </div>
       </div>
 
@@ -301,7 +320,7 @@ export function FeatureRequestDetailClient({
         </Card>
       ) : null}
 
-      <WorkflowStepper status={feature.status} />
+      <WorkflowStepper status={feature.status} taskGenerationActive={isGeneratingTasks} />
 
       {feature.status === "rejected" && (
         <Card className="border-destructive/40 bg-destructive/5">
@@ -321,228 +340,249 @@ export function FeatureRequestDetailClient({
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Request</CardTitle>
-        </CardHeader>
-        <CardContent className="whitespace-pre-wrap text-sm">
-          {feature.description}
-        </CardContent>
-      </Card>
+      {/* ── Request (collapsed once PRD exists) ──────────────────────── */}
+      <CollapsibleCard
+        title="Request"
+        defaultOpen={!feature.prd}
+        summary={feature.description.slice(0, 80) + (feature.description.length > 80 ? "…" : "")}
+        accent="muted"
+      >
+        <p className="whitespace-pre-wrap text-sm">{feature.description}</p>
+      </CollapsibleCard>
 
+      {/* ── Clarifications ──────────────────────────────────────────── */}
       {feature.clarifications.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Clarifications</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <CollapsibleCard
+          title="Clarifications"
+          defaultOpen={feature.status === "draft" && !feature.prd}
+          accent="sky"
+          statusPill={
+            <span className="rounded-full bg-sky-500/10 px-2 py-0.5 text-[11px] text-sky-600">
+              {feature.clarifications.length} message{feature.clarifications.length !== 1 ? "s" : ""}
+            </span>
+          }
+          summary={undefined}
+        >
+          <div className="space-y-3">
             {feature.clarifications.map((msg) => (
               <div key={msg.id} className="rounded-lg border p-3 text-sm">
-                <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">
-                  {msg.role}
-                </p>
+                <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">{msg.role}</p>
                 <p className="whitespace-pre-wrap">{msg.content}</p>
               </div>
             ))}
             {feature.status !== "duplicate" && (
               <form
                 className="space-y-2 pt-2"
-                onSubmit={(event) => {
-                  event.preventDefault();
+                onSubmit={(e) => {
+                  e.preventDefault();
                   if (!clarifyReply.trim()) return;
-                  clarifyReplyMutation.mutate({
-                    featureRequestId: featureId,
-                    content: clarifyReply.trim(),
-                    role: "user",
-                  });
+                  clarifyReplyMutation.mutate({ featureRequestId: featureId, content: clarifyReply.trim(), role: "user" });
                   setClarifyReply("");
                 }}
               >
-                <Textarea
-                  value={clarifyReply}
-                  onChange={(event) => setClarifyReply(event.target.value)}
-                  placeholder="Reply to clarification questions…"
-                  rows={3}
-                />
-                <Button
-                  type="submit"
-                  size="sm"
-                  disabled={clarifyReplyMutation.isPending || !clarifyReply.trim()}
-                >
-                  {clarifyReplyMutation.isPending ? (
-                    <ButtonLoadingLabel>Saving…</ButtonLoadingLabel>
-                  ) : (
-                    "Send reply"
-                  )}
+                <Textarea value={clarifyReply} onChange={(e) => setClarifyReply(e.target.value)} placeholder="Reply to clarification questions…" rows={3} />
+                <Button type="submit" size="sm" disabled={clarifyReplyMutation.isPending || !clarifyReply.trim()}>
+                  {clarifyReplyMutation.isPending ? <ButtonLoadingLabel>Saving…</ButtonLoadingLabel> : "Send reply"}
                 </Button>
               </form>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
       )}
 
+      {/* ── Approve PRD ─────────────────────────────────────────────── */}
       {feature.status === "awaiting_prd_approval" && feature.prd && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Approve PRD</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <CollapsibleCard title="Approve PRD" defaultOpen accent="amber"
+          statusPill={<span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-600">Action needed</span>}>
+          <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Review the generated PRD below. Approve it before breaking work into
-              engineering tasks.
+              Review the PRD below. Approve it to unlock task generation.
             </p>
-            <Button
-              size="sm"
-              disabled={isApprovingPrd || approvePrdMutation.isPending}
+            <Button size="sm" disabled={isApprovingPrd || approvePrdMutation.isPending}
               onClick={() => {
                 startPrdApproval(async () => {
                   try {
                     await approvePrdAction(featureId);
-                    toast.success("PRD approved");
+                    toast.success("PRD approved — now generate tasks");
                     await invalidate();
                   } catch (error) {
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : "Failed to approve PRD",
-                    );
+                    toast.error(error instanceof Error ? error.message : "Failed to approve PRD");
                   }
                 });
-              }}
-            >
-              {isApprovingPrd || approvePrdMutation.isPending ? (
-                <ButtonLoadingLabel>Approving…</ButtonLoadingLabel>
-              ) : (
-                "Approve PRD"
-              )}
+              }}>
+              {isApprovingPrd || approvePrdMutation.isPending ? <ButtonLoadingLabel>Approving…</ButtonLoadingLabel> : "Approve PRD"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
       )}
 
+      {/* ── Approve plan ─────────────────────────────────────────────── */}
       {feature.status === "awaiting_plan_approval" && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Approve engineering plan</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
+        <CollapsibleCard title="Approve engineering plan" defaultOpen accent="amber"
+          statusPill={<span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-600">Action needed</span>}>
+          <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
               Team review required before development.{" "}
               {planApprovalStatus
                 ? `${planApprovalStatus.approvals.length} of ${planApprovalStatus.required} approval(s) recorded.`
-                : (
-                  <span className="inline-flex items-center gap-2">
-                    <LoadingIllustration variant="inline" size="sm" />
-                    Loading approval status…
-                  </span>
-                )}
+                : <span className="inline-flex items-center gap-2"><LoadingIllustration variant="inline" size="sm" />Loading…</span>}
             </p>
             {planApprovalStatus && planApprovalStatus.approvals.length > 0 && (
               <ul className="space-y-1 text-sm">
-                {planApprovalStatus.approvals.map((approval) => (
-                  <li key={approval.id} className="text-muted-foreground">
-                    ✓ {approval.reviewer.name} ({approval.reviewer.email})
-                  </li>
+                {planApprovalStatus.approvals.map((a) => (
+                  <li key={a.id} className="text-muted-foreground">✓ {a.reviewer.name} ({a.reviewer.email})</li>
                 ))}
               </ul>
             )}
-            <Button
-              size="sm"
-              disabled={
-                isApprovingPlan ||
-                planApprovalStatus?.currentUserApproved === true
-              }
+            <Button size="sm"
+              disabled={isApprovingPlan || planApprovalStatus?.currentUserApproved === true}
               onClick={() => {
                 startPlanApproval(async () => {
                   try {
                     const result = await approvePlanAction(featureId);
-                    if (result.complete) {
-                      toast.success("Plan fully approved — development can begin");
-                    } else {
-                      toast.success(
-                        `Your approval recorded (${result.approvalCount}/${result.required})`,
-                      );
-                    }
+                    toast.success(result.complete ? "Plan fully approved — development can begin" : `Your approval recorded (${result.approvalCount}/${result.required})`);
                     await invalidate();
                   } catch (error) {
-                    toast.error(
-                      error instanceof Error
-                        ? error.message
-                        : "Failed to approve plan",
-                    );
+                    toast.error(error instanceof Error ? error.message : "Failed to approve plan");
                   }
                 });
-              }}
-            >
-              {planApprovalStatus?.currentUserApproved
-                ? "You approved"
-                : isApprovingPlan
-                  ? "Approving…"
-                  : "Approve plan"}
+              }}>
+              {planApprovalStatus?.currentUserApproved ? "You approved" : isApprovingPlan ? "Approving…" : "Approve plan"}
             </Button>
-          </CardContent>
-        </Card>
+          </div>
+        </CollapsibleCard>
       )}
 
+      {/* ── PRD ──────────────────────────────────────────────────────── */}
       {feature.prd && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between gap-4">
-            <CardTitle className="text-base">PRD</CardTitle>
-            <div className="flex items-center gap-2">
-              {feature.prd.status === "approved" ? (
-                <span className="text-xs text-emerald-600">Approved</span>
-              ) : (
-                <span className="text-xs text-amber-600">Draft — awaiting approval</span>
-              )}
-            </div>
-            <Link
-              href={`/dashboard/prd/${featureId}`}
-              className="text-sm text-muted-foreground hover:underline"
-            >
-              Open in PRD Editor →
-            </Link>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
-              <p className="mb-1 font-medium text-foreground">Why this PRD</p>
-              <p>
-                Built from request: <strong>{feature.title}</strong>
+        <CollapsibleCard
+          title="PRD"
+          defaultOpen={feature.status === "awaiting_prd_approval" || feature.status === "prd_ready"}
+          accent={feature.prd.status === "approved" ? "green" : "amber"}
+          statusPill={
+            feature.prd.status === "approved"
+              ? <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-600">Approved</span>
+              : <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-600">Awaiting approval</span>
+          }
+          summary="Product Requirements Document"
+        >
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                {feature.clarifications.length > 0 ? `Informed by ${feature.clarifications.length} clarification message(s).` : "Generated from request description."}
               </p>
-              {feature.clarifications.length > 0 ? (
-                <p className="mt-1">
-                  Informed by {feature.clarifications.length} clarification
-                  message(s) above.
-                </p>
-              ) : null}
+              <Link href={`/dashboard/prd/${featureId}`} className="text-xs text-muted-foreground hover:underline">
+                Open in PRD Editor →
+              </Link>
             </div>
-            <PrdDiffPanel
-              aiDraftMarkdown={feature.prd.aiDraftMarkdown}
-              currentMarkdown={feature.prd.rawMarkdown}
-            />
-            <pre className="whitespace-pre-wrap text-sm">
-              {feature.prd.rawMarkdown}
-            </pre>
-          </CardContent>
-        </Card>
+            <PrdDiffPanel aiDraftMarkdown={feature.prd.aiDraftMarkdown} currentMarkdown={feature.prd.rawMarkdown} />
+            <pre className="whitespace-pre-wrap text-sm">{feature.prd.rawMarkdown}</pre>
+          </div>
+        </CollapsibleCard>
       )}
 
-      {feature.tasks.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Engineering tasks</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {feature.tasks.map((task) => (
-              <div
-                key={task.id}
-                className="flex items-center justify-between rounded border px-3 py-2 text-sm"
-              >
-                <span>{task.title}</span>
-                <span className="text-xs text-muted-foreground">{task.status}</span>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+      {/* ── Engineering tasks ────────────────────────────────────────── */}
+      {hasTasks && (
+        <CollapsibleCard
+          title="Engineering tasks"
+          defaultOpen
+          accent="violet"
+          statusPill={
+            <span className="rounded-full bg-violet-500/10 px-2 py-0.5 text-[11px] text-violet-600">
+              {feature.tasks.filter((t) => t.status === "done").length}/{feature.tasks.length} done
+            </span>
+          }
+          summary={undefined}
+        >
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              These tasks were generated from the approved PRD. Use the Task Board to move them forward, generate code with AI, or manage them.
+            </p>
+            <div className="space-y-1.5">
+              {feature.tasks.map((task) => (
+                <div key={task.id} className="flex items-center justify-between rounded border px-3 py-2 text-sm">
+                  <span className={task.status === "done" ? "line-through text-muted-foreground" : ""}>{task.title}</span>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full ${
+                    task.status === "done" ? "bg-emerald-500/10 text-emerald-600" :
+                    task.status === "in_progress" ? "bg-violet-500/10 text-violet-600" :
+                    "bg-muted text-muted-foreground"
+                  }`}>{task.status.replace("_", " ")}</span>
+                </div>
+              ))}
+            </div>
+            <div className="pt-2">
+              <Link href={tasksUrl}>
+                <Button size="sm">
+                  Open Task Board → work on these tasks
+                </Button>
+              </Link>
+            </div>
+          </div>
+        </CollapsibleCard>
+      )}
+
+      {/* ── Task generation in progress ──────────────────────────────── */}
+      {feature.status === "planning" && !isGeneratingTasks && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.05] p-4 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className="inline-block size-2 rounded-full bg-amber-500" />
+            <p className="text-sm font-medium text-amber-700">Task generation didn&apos;t finish</p>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Something interrupted the last attempt. Click <strong>Retry generate tasks</strong> below — it usually takes about 15 seconds.
+          </p>
+          <Button size="sm" variant="outline"
+            disabled={isGeneratingTasks}
+            onClick={() => void runTasksDirectly()}>
+            {isGeneratingTasks ? <ButtonLoadingLabel>Generating…</ButtonLoadingLabel> : "Retry generate tasks"}
+          </Button>
+        </div>
+      )}
+
+      {isGeneratingTasks ? (
+        <div className="rounded-xl border border-violet-500/30 bg-violet-500/[0.05] p-4">
+          <div className="flex items-center gap-2">
+            <span className="inline-block size-2 animate-pulse rounded-full bg-violet-500" />
+            <p className="text-sm font-medium text-violet-700">Breaking PRD into engineering tasks…</p>
+          </div>
+          <TaskGenerationProgress className="mt-3" />
+        </div>
+      ) : null}
+
+      {/* ── Next step hints ──────────────────────────────────────────── */}
+      {!hasTasks && feature.status !== "planning" && feature.prd?.status === "approved" && (
+        <div className="rounded-xl border border-dashed border-violet-500/40 bg-violet-500/[0.03] p-4 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">Next: Generate engineering tasks</p>
+          <p className="mt-1 text-xs">The PRD is approved. Click <strong>Generate tasks ({AI_CREDIT_COSTS.tasks} cr)</strong> above to break it into actionable engineering tasks on the Task Board.</p>
+        </div>
+      )}
+      {!feature.prd && feature.status !== "prd_generating" && (
+        <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
+          <p className="font-medium text-foreground">Next: Generate a PRD</p>
+          <p className="mt-1 text-xs">Click <strong>Generate PRD</strong> above to create a structured Product Requirements Document from this request{feature.clarifications.length > 0 ? " and the clarifications" : ""}.</p>
+        </div>
+      )}
+
+      {/* ── Code generation target ──────────────────────────────────── */}
+      {(feature.project.repositories?.length ?? 0) > 0 && (
+        <CollapsibleCard
+          title="Code generation target"
+          defaultOpen={!feature.targetRepository}
+          accent={feature.targetRepository ? "green" : "amber"}
+          statusPill={
+            feature.targetRepository
+              ? <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-600">{feature.targetRepository.repoFullName}</span>
+              : <span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-600">Not set</span>
+          }
+          summary={feature.targetRepository ? undefined : "Pick a repo for AI code generation"}
+        >
+          <FeatureTargetRepoPicker
+            featureRequestId={featureId}
+            connectedRepos={feature.project.repositories ?? []}
+            targetRepository={feature.targetRepository ?? null}
+            onChanged={invalidate}
+          />
+        </CollapsibleCard>
       )}
 
       <PrLinkPanel

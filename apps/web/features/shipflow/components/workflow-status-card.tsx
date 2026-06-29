@@ -13,9 +13,11 @@ export function WorkflowStatusCard({ status }: { status: string }) {
   }
 
   const percent =
-    progress.inFlight && progress.step > 0
-      ? Math.round((progress.step / progress.totalSteps) * 100)
-      : 0;
+    progress.inFlight
+      ? null
+      : progress.step > 0
+        ? Math.round((progress.step / progress.totalSteps) * 100)
+        : 0;
 
   return (
     <Card
@@ -34,6 +36,21 @@ export function WorkflowStatusCard({ status }: { status: string }) {
       </CardHeader>
       <CardContent className="space-y-3 text-sm text-muted-foreground">
         {progress.inFlight ? (
+          <>
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-medium text-foreground">
+                Step {progress.step} of {progress.totalSteps}: {progress.stepLabel}
+              </span>
+              <span>Working…</span>
+            </div>
+            <div className="relative h-2 overflow-hidden rounded-full bg-muted">
+              <div
+                className="absolute inset-y-0 w-1/3 rounded-full bg-gradient-to-r from-status-success via-status-warning to-status-progress motion-safe:animate-[task-gen-slide_1.4s_ease-in-out_infinite]"
+                aria-hidden
+              />
+            </div>
+          </>
+        ) : percent !== null && percent > 0 ? (
           <>
             <div className="flex items-center justify-between text-xs">
               <span className="font-medium text-foreground">

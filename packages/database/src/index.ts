@@ -46,7 +46,12 @@ function isConnectionError(error: unknown) {
     message.includes("connection") ||
     message.includes("terminated") ||
     message.includes("timeout") ||
-    message.includes("econnreset")
+    message.includes("econnreset") ||
+    message.includes("socket") ||
+    message.includes("epipe") ||
+    message.includes("57p01") || // Neon: admin shutdown
+    message.includes("57p02") || // Neon: crash shutdown
+    message.includes("57p03")    // Neon: cannot connect now (cold start)
   );
 }
 
@@ -81,9 +86,12 @@ function normalizeDatabaseUrl(url: string) {
 function createPgPool(connectionString: string) {
   const pool = new Pool({
     connectionString,
-    max: 5,
-    connectionTimeoutMillis: 30_000,
-    idleTimeoutMillis: 60_000,
+    max: 3,
+    // Keep connections alive: Neon drops idle connections after ~5 min.
+    // Set idle timeout below that so the pool drops them first and rebuilds
+    // fresh ones rather than getting a "Connection terminated" surprise.
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 10_000,
     allowExitOnIdle: false,
   });
 
@@ -137,6 +145,7 @@ function isClientComplete(client: PrismaClient) {
   const aiReviewFields = models.AIReview?.fields ?? [];
   const pullRequestFields = models.PullRequest?.fields ?? [];
   const workspaceFields = models.Workspace?.fields ?? [];
+  const featureRequestFields = models.FeatureRequest?.fields ?? [];
 
   const hasConfidenceScore = aiReviewFields.some(
     (field) => field.name === "confidenceScore",
@@ -147,8 +156,11 @@ function isClientComplete(client: PrismaClient) {
   const hasWorkspaceReviewSettings = workspaceFields.some(
     (field) => field.name === "mutedReviewCategories",
   );
+  const hasTargetRepository = featureRequestFields.some(
+    (field) => field.name === "targetRepositoryId",
+  );
 
-  return hasConfidenceScore && hasPrSizeFields && hasWorkspaceReviewSettings;
+  return hasConfidenceScore && hasPrSizeFields && hasWorkspaceReviewSettings && hasTargetRepository;
 }
 
 function getPrismaClient() {
@@ -209,7 +221,8 @@ export async function withDbRetry<T>(
   operation: () => Promise<T>,
   options?: { attempts?: number },
 ) {
-  const attempts = options?.attempts ?? 3;
+  // Use more attempts with exponential backoff so Neon has time to cold-start.
+  const attempts = options?.attempts ?? 5;
   let lastError: unknown;
 
   for (let attempt = 1; attempt <= attempts; attempt += 1) {
@@ -232,7 +245,8 @@ export async function withDbRetry<T>(
       }
 
       await invalidateDbConnection();
-      await sleep(250 * attempt);
+      // Exponential backoff: 500ms, 1s, 2s, 4s — gives Neon time to cold-start.
+      await sleep(Math.min(500 * 2 ** (attempt - 1), 4000));
     }
   }
 

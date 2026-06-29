@@ -15,19 +15,23 @@ export async function listTasks(featureRequestId: string) {
 }
 
 export async function createTasks(featureRequestId: string, tasks: TaskInput[]) {
-  return prisma.$transaction(
-    tasks.map((task, index) =>
-      prisma.task.create({
-        data: {
-          featureRequestId,
-          title: task.title,
-          description: task.description,
-          priority: task.priority ?? "medium",
-          order: task.order ?? index,
-        },
-      }),
-    ),
-  );
+  if (tasks.length === 0) {
+    return [];
+  }
+
+  // createMany is one round-trip — avoids Prisma's default 5s interactive
+  // transaction timeout when saving many tasks individually.
+  await prisma.task.createMany({
+    data: tasks.map((task, index) => ({
+      featureRequestId,
+      title: task.title.slice(0, 500),
+      description: task.description?.slice(0, 10_000) ?? null,
+      priority: task.priority ?? "medium",
+      order: task.order ?? index,
+    })),
+  });
+
+  return tasks;
 }
 
 export async function updateTaskStatus(taskId: string, status: string) {

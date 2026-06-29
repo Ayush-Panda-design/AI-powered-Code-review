@@ -161,33 +161,36 @@ model ConnectedRepository {
   defaultBranch  String   @default("main")
   createdAt      DateTime @default(now())
 
-  project      Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  pullRequests PullRequest[]
+  project         Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  pullRequests    PullRequest[]
+  targetedFeatures FeatureRequest[] @relation("FeatureTargetRepo")
 
   @@unique([projectId, repoFullName])
   @@map("connected_repository")
 }
 
 model FeatureRequest {
-  id          String   @id @default(cuid())
-  projectId   String
-  title       String
-  description String   @db.Text
-  source      String   @default("manual")
-  status      String   @default("draft")
-  createdById String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                 String   @id @default(cuid())
+  projectId          String
+  title              String
+  description        String   @db.Text
+  source             String   @default("manual")
+  status             String   @default("draft")
+  createdById        String?
+  targetRepositoryId String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
-  project         Project                @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  createdBy       User?                  @relation("FeatureRequestCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  clarifications  ClarificationMessage[]
-  prd             PRD?
-  tasks           Task[]
-  pullRequests    PullRequest[]
-  aiReviews       AIReview[]
-  approvals       ReleaseApproval[]
-  planApprovals   PlanApproval[]
+  project          Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdBy        User?                @relation("FeatureRequestCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  targetRepository ConnectedRepository? @relation("FeatureTargetRepo", fields: [targetRepositoryId], references: [id], onDelete: SetNull)
+  clarifications   ClarificationMessage[]
+  prd              PRD?
+  tasks            Task[]
+  pullRequests     PullRequest[]
+  aiReviews        AIReview[]
+  approvals        ReleaseApproval[]
+  planApprovals    PlanApproval[]
 
   @@index([projectId])
   @@index([status])
@@ -238,8 +241,15 @@ model Task {
   priority           String   @default("medium")
   order              Int      @default(0)
   codeGenStatus      String   @default("none")
+  codeGenStage       String?
+  codeGenError       String?  @db.Text
   aiGeneratable      Boolean  @default(true)
   draftPullRequestId String?
+  generatedFilePath  String?
+  generatedCode      String?  @db.Text
+  generatedSummary   String?  @db.Text
+  draftPrUrl         String?
+  draftPrNumber      Int?
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
 

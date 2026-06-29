@@ -16,6 +16,11 @@ type GitHubRepository = {
   full_name: string;
 };
 
+export type ConnectedRepoRef = {
+  full_name: string;
+  installationId: number;
+};
+
 type GitHubPullRequest = {
   number: number;
   title: string;
@@ -68,6 +73,43 @@ async function listOpenPullRequests(octokit: Octokit, repoFullName: string) {
 
 export function repoStepId(repoFullName: string) {
   return repoFullName.replace(/[^a-zA-Z0-9]+/g, "-");
+}
+
+/**
+ * Sync connected repos that may belong to different GitHub App installations
+ * (e.g. personal vs org). Each installation is synced with its own octokit.
+ */
+export async function syncConnectedRepositories(
+  repositories: ConnectedRepoRef[],
+  syncRunId?: string,
+) {
+  const byInstallation = new Map<number, GitHubRepository[]>();
+
+  for (const repo of repositories) {
+    const list = byInstallation.get(repo.installationId) ?? [];
+    list.push({ full_name: repo.full_name });
+    byInstallation.set(repo.installationId, list);
+  }
+
+  let synced = 0;
+  let changed = 0;
+  let queued = 0;
+  let failedRepos = 0;
+  let totalRepos = repositories.length;
+
+  for (const [installationId, repos] of byInstallation) {
+    const result = await syncAllRepositories({
+      installationId,
+      repositories: repos,
+      syncRunId,
+    });
+    synced += result.synced;
+    changed += result.changed;
+    queued += result.queued;
+    failedRepos += result.failedRepos;
+  }
+
+  return { synced, changed, queued, failedRepos, totalRepos };
 }
 
 /** Sync all repos for an installation in parallel using a single shared octokit. */

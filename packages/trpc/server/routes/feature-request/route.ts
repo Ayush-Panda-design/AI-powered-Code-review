@@ -71,6 +71,35 @@ export const featureRequestRouter = router({
       return feature;
     }),
 
+  setTargetRepository: protectedProcedure
+    .input(
+      z.object({
+        featureRequestId: z.string(),
+        repositoryId: z.string().nullable(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const feature = await prisma.featureRequest.findUnique({
+        where: { id: input.featureRequestId },
+        select: { projectId: true },
+      });
+      if (!feature) throw new TRPCError({ code: "NOT_FOUND" });
+      await assertProjectAccess(feature.projectId, ctx.userId);
+
+      // Verify the repo belongs to this feature's project
+      if (input.repositoryId) {
+        const repo = await prisma.connectedRepository.findFirst({
+          where: { id: input.repositoryId, projectId: feature.projectId },
+        });
+        if (!repo) throw new TRPCError({ code: "BAD_REQUEST", message: "Repository not connected to this project." });
+      }
+
+      return prisma.featureRequest.update({
+        where: { id: input.featureRequestId },
+        data: { targetRepositoryId: input.repositoryId },
+      });
+    }),
+
   updateStatus: protectedProcedure
     .input(z.object({ id: z.string(), status: z.string() }))
     .mutation(async ({ ctx, input }) => {
