@@ -8,6 +8,7 @@ import {
   listFeatureRequests,
   listLinkablePullRequests,
   listPlanApprovals,
+  queueAutoClarification,
   sendReviewJob,
   unlinkPullRequestFromFeature,
   updateFeatureStatus,
@@ -68,6 +69,10 @@ export const featureRequestRouter = router({
         createdById: ctx.userId,
       });
 
+      if (feature.status === "draft") {
+        await queueAutoClarification(feature.id);
+      }
+
       return feature;
     }),
 
@@ -127,11 +132,19 @@ export const featureRequestRouter = router({
       }
 
       await assertProjectAccess(feature.projectId, ctx.userId);
-      return addClarification(
+      const message = await addClarification(
         input.featureRequestId,
         input.role,
         input.content,
       );
+
+      let clarifyQueued = false;
+      if (input.role === "user") {
+        const result = await queueAutoClarification(input.featureRequestId);
+        clarifyQueued = result.queued;
+      }
+
+      return { ...message, clarifyQueued };
     }),
 
   planApprovalStatus: protectedProcedure

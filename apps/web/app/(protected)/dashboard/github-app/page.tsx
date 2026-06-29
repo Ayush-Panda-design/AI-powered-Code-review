@@ -8,12 +8,12 @@ import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
 
 type GitHubAppPageProps = {
-  searchParams: Promise<{ error?: string; detail?: string }>;
+  searchParams: Promise<{ error?: string }>;
 };
 
 export default async function GitHubAppPage({ searchParams }: GitHubAppPageProps) {
   const session = await requireSession("/dashboard/github-app");
-  const { error, detail } = await searchParams;
+  const { error } = await searchParams;
 
   let installation = await getInstallationForUser(session.user.id);
   if (!installation) {
@@ -43,7 +43,6 @@ export default async function GitHubAppPage({ searchParams }: GitHubAppPageProps
           : null
       }
       error={error ?? null}
-      errorDetail={detail ?? null}
       diagnostics={diagnostics}
     />
   );

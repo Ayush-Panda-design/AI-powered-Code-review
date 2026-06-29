@@ -5,6 +5,7 @@ import {
   resolveWorkspaceIdForFeature,
   sendClarifyJob,
   sendPrdJob,
+  sendTasksJob,
   updateFeatureStatus,
 } from "@repo/services";
 import { AI_CREDIT_COSTS } from "@repo/services/constants";
@@ -108,14 +109,14 @@ export const shipflowRouter = router({
         AI_CREDIT_COSTS.tasks,
       );
 
-      // Reset status to prd_ready so the direct API route can run cleanly.
-      // The actual generation is done by POST /api/shipflow/generate-tasks
-      // which runs synchronously (no Inngest needed for a single AI call).
       if (feature.status === "planning") {
         await updateFeatureStatus(input.featureRequestId, "prd_ready");
       }
 
-      return { ok: true, runDirect: true };
+      await updateFeatureStatus(input.featureRequestId, "planning");
+      await sendTasksJob(input.featureRequestId);
+
+      return { ok: true };
     }),
 
   /** Reset a feature stuck in "planning" so tasks can be regenerated. */

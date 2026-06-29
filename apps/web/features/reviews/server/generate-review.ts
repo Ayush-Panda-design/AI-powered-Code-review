@@ -114,6 +114,10 @@ function formatContext(chunks: RetrievedChunk[]) {
 }
 
 function formatPrdContext(context: ReviewContext) {
+  if (context.prdMarkdown?.trim()) {
+    return truncateText(context.prdMarkdown.trim(), MAX_PRD_CHARS);
+  }
+
   if (!context.prd) {
     return "No PRD is linked to this pull request.";
   }
@@ -227,7 +231,10 @@ export async function generateReview(
 ) {
   const model = getReviewModel();
   const diffContext = formatContext(contextChunks);
-  const isPrdAware = Boolean(reviewContext.featureRequestId && reviewContext.prd);
+  const isPrdAware = Boolean(
+    reviewContext.featureRequestId &&
+      (reviewContext.prd || reviewContext.prdMarkdown),
+  );
 
   const suppressionNote =
     options?.suppressedPatterns?.length || options?.mutedCategories?.length

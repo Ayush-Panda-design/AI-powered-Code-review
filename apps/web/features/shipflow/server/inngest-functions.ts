@@ -42,6 +42,24 @@ export const clarifyFeatureRequest = inngest.createFunction(
       feature.title,
       featureRequestId,
     );
+
+    const exactDuplicate = similar.find(
+      (item) =>
+        item.title.trim().toLowerCase() === feature.title.trim().toLowerCase(),
+    );
+
+    if (exactDuplicate) {
+      const education = [
+        `This request closely matches an existing feature: "${exactDuplicate.title}" (status: ${exactDuplicate.status}).`,
+        "Before building something new, consider extending that feature or linking this request to the existing work.",
+        "This request has been marked as a duplicate for review.",
+      ].join("\n\n");
+
+      await addClarification(featureRequestId, "assistant", education);
+      await updateFeatureStatus(featureRequestId, "duplicate");
+      return { ok: true, duplicate: true };
+    }
+
     const similarContext = formatSimilarFeaturesForClarify(similar);
 
     // Fetch repo context if a target repository is assigned.

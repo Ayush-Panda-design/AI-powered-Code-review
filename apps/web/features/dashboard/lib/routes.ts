@@ -7,6 +7,7 @@ import {
   LayoutDashboard,
   Lightbulb,
   FolderGit2,
+  Inbox,
   Settings,
   AppWindow,
   Building2,
@@ -50,6 +51,12 @@ export const dashboardRoutes: DashboardRoute[] = [
     href: `${DASHBOARD_BASE_PATH}/feature-requests`,
     icon: Lightbulb,
     description: "Request → PRD → Tasks → Ship",
+  },
+  {
+    title: "Customer Intake",
+    href: `${DASHBOARD_BASE_PATH}/intake`,
+    icon: Inbox,
+    description: "Email, ticket, and call intake demo",
   },
   {
     title: "PRD Editor",

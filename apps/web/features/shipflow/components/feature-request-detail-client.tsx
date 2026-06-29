@@ -137,35 +137,12 @@ export function FeatureRequestDetailClient({
     aiMutationHandlers("Generate PRD", AI_CREDIT_COSTS.prd),
   );
 
-  const [isGeneratingTasks, setIsGeneratingTasks] = useState(false);
+  const tasksMutation = trpc.shipflow.triggerTasks.useMutation(
+    aiMutationHandlers("Generate tasks", AI_CREDIT_COSTS.tasks),
+  );
 
-  // Direct API — one round-trip, no Inngest / extra tRPC status reset.
-  const runTasksDirectly = async () => {
-    setIsGeneratingTasks(true);
-    const toastId = `tasks-${featureId}`;
-    toast.loading(`Generating tasks… (${AI_CREDIT_COSTS.tasks} credits)`, { id: toastId });
-    try {
-      const res = await fetch("/api/shipflow/generate-tasks", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ featureRequestId: featureId }),
-      });
-      const data = (await res.json().catch(() => null)) as
-        | { ok?: boolean; count?: number; error?: string } | null;
-      if (!res.ok || !data?.ok) {
-        throw new Error(data?.error ?? "We couldn't generate tasks. Please try again.");
-      }
-      toast.success(`${data.count ?? ""} tasks generated — go to the Task Board!`, { id: toastId });
-      await invalidate();
-    } catch (error) {
-      toast.error(
-        error instanceof Error ? error.message : "We couldn't generate tasks. Please try again.",
-        { id: toastId },
-      );
-    } finally {
-      setIsGeneratingTasks(false);
-    }
-  };
+  const isGeneratingTasks =
+    feature?.status === "planning" || tasksMutation.isPending;
 
   const approvePrdMutation = trpc.shipflow.approvePrd.useMutation({
     onSuccess: async () => {
@@ -181,8 +158,13 @@ export function FeatureRequestDetailClient({
   );
 
   const clarifyReplyMutation = trpc.featureRequest.addClarification.useMutation({
-    onSuccess: async () => {
-      toast.success("Reply saved");
+    onSuccess: async (result) => {
+      setClarifyReply("");
+      if (result.clarifyQueued) {
+        toast.success("Reply sent — AI is preparing follow-up questions");
+      } else {
+        toast.success("Reply saved");
+      }
       await invalidate();
     },
     onError: (err) => toast.error(err.message),
@@ -289,7 +271,7 @@ export function FeatureRequestDetailClient({
             onClick={() => {
               const { canAfford, hint } = creditAffordance(AI_CREDIT_COSTS.tasks);
               if (!canAfford) { toast.error(hint); return; }
-              void runTasksDirectly();
+              tasksMutation.mutate({ featureRequestId: featureId });
             }}
           >
             {isGeneratingTasks
@@ -376,11 +358,17 @@ export function FeatureRequestDetailClient({
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (!clarifyReply.trim()) return;
-                  clarifyReplyMutation.mutate({ featureRequestId: featureId, content: clarifyReply.trim(), role: "user" });
-                  setClarifyReply("");
+                  clarifyReplyMutation.mutate({
+                    featureRequestId: featureId,
+                    content: clarifyReply.trim(),
+                    role: "user",
+                  });
                 }}
               >
                 <Textarea value={clarifyReply} onChange={(e) => setClarifyReply(e.target.value)} placeholder="Reply to clarification questions…" rows={3} />
+                <p className="text-xs text-muted-foreground">
+                  Your reply automatically queues the next AI clarification round.
+                </p>
                 <Button type="submit" size="sm" disabled={clarifyReplyMutation.isPending || !clarifyReply.trim()}>
                   {clarifyReplyMutation.isPending ? <ButtonLoadingLabel>Saving…</ButtonLoadingLabel> : "Send reply"}
                 </Button>
@@ -533,7 +521,7 @@ export function FeatureRequestDetailClient({
           </p>
           <Button size="sm" variant="outline"
             disabled={isGeneratingTasks}
-            onClick={() => void runTasksDirectly()}>
+            onClick={() => tasksMutation.mutate({ featureRequestId: featureId })}>
             {isGeneratingTasks ? <ButtonLoadingLabel>Generating…</ButtonLoadingLabel> : "Retry generate tasks"}
           </Button>
         </div>

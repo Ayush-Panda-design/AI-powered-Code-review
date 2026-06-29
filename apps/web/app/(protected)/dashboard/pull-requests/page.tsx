@@ -13,7 +13,9 @@ import { PullRequestsTableClient } from "@/features/dashboard/components/pull-re
 import { ReviewConfigBanner } from "@/features/dashboard/components/review-config-banner";
 import { getInstallationForUser } from "@/features/github/server/installation";
 import { isReviewPipelineConfigured } from "@/features/reviews/server/review-config";
+import { ensureWorkspaceAction } from "@/lib/actions/shipflow";
 import { requireSession } from "@/lib/auth-session";
+import { countConnectedRepositories } from "@repo/services";
 
 export default async function PullRequestsPage() {
   const session = await requireSession("/dashboard/pull-requests");
@@ -42,11 +44,16 @@ export default async function PullRequestsPage() {
   }
 
   const reviewConfigured = isReviewPipelineConfigured();
+  const workspace = await ensureWorkspaceAction();
+  const connectedReposCount = await countConnectedRepositories(workspace.id);
 
   return (
     <div className="flex flex-col gap-6">
       <ReviewConfigBanner />
-      <PullRequestsTableClient reviewConfigured={reviewConfigured} />
+      <PullRequestsTableClient
+        reviewConfigured={reviewConfigured}
+        connectedReposCount={connectedReposCount}
+      />
     </div>
   );
 }

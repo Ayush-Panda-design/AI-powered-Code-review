@@ -175,10 +175,34 @@ const statusStyles: Record<string, string> = {
 
 type PullRequestsTableClientProps = {
   reviewConfigured: boolean;
+  connectedReposCount: number;
 };
+
+function ConnectReposFirstBanner() {
+  return (
+    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm">
+      <p className="font-medium text-amber-900 dark:text-amber-200">
+        Connect a repository before syncing
+      </p>
+      <p className="mt-1 text-amber-800 dark:text-amber-300">
+        Sync from GitHub only pulls PRs from repos you have connected in ShipFlow —
+        not every repo the GitHub App can access. Open{" "}
+        <Link
+          href={`${DASHBOARD_BASE_PATH}/repositories`}
+          className="font-medium underline underline-offset-4"
+        >
+          Repositories
+        </Link>
+        , click <strong>Connect</strong> on at least one repo, then return here to
+        sync.
+      </p>
+    </div>
+  );
+}
 
 export function PullRequestsTableClient({
   reviewConfigured,
+  connectedReposCount,
 }: PullRequestsTableClientProps) {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
@@ -267,24 +291,32 @@ export function PullRequestsTableClient({
 
   if (pullRequests.length === 0) {
     return (
-      <Empty className="border border-dashed">
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <GitPullRequest />
-          </EmptyMedia>
-          <EmptyTitle>No pull requests yet</EmptyTitle>
-          <EmptyDescription>
-            Open a pull request on a connected repository, or sync existing open
-            PRs from GitHub.
-          </EmptyDescription>
-        </EmptyHeader>
-        <SyncPullRequestsButton className="items-center" />
-      </Empty>
+      <div className="flex flex-col gap-4">
+        {connectedReposCount === 0 ? <ConnectReposFirstBanner /> : null}
+        <Empty className="border border-dashed">
+          <EmptyHeader>
+            <EmptyMedia variant="icon">
+              <GitPullRequest />
+            </EmptyMedia>
+            <EmptyTitle>No pull requests yet</EmptyTitle>
+            <EmptyDescription>
+              {connectedReposCount === 0
+                ? "Connect a repository first, then sync open PRs from GitHub."
+                : "Open a pull request on a connected repository, or sync existing open PRs from GitHub."}
+            </EmptyDescription>
+          </EmptyHeader>
+          <SyncPullRequestsButton
+            className="items-center"
+            connectedReposCount={connectedReposCount}
+          />
+        </Empty>
+      </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4">
+      {connectedReposCount === 0 ? <ConnectReposFirstBanner /> : null}
       <div className="flex items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold">Pull Requests</h2>
@@ -295,7 +327,7 @@ export function PullRequestsTableClient({
             ) : null}
           </p>
         </div>
-        <SyncPullRequestsButton />
+        <SyncPullRequestsButton connectedReposCount={connectedReposCount} />
       </div>
 
       <DashboardListFilters

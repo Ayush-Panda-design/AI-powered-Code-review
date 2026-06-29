@@ -142,7 +142,7 @@ async function assertUserOwnsInstallation(userId: string, installationId: number
 
   if (!matches) {
     throw new Error(
-      `This installation is on @${account.login}, but your ShipFlow login is tied to a different GitHub account. Sign in with the matching GitHub account.`,
+      "This GitHub App installation does not belong to the account you signed in with. Install on GitHub while signed in as your own account.",
     );
   }
 }
@@ -165,6 +165,15 @@ export async function getInstallationForUser(userId: string) {
   }
 }
 
+async function resolveWorkspaceIdForUser(userId: string) {
+  const membership = await prisma.workspaceMember.findFirst({
+    where: { userId },
+    orderBy: { createdAt: "asc" },
+    select: { workspaceId: true },
+  });
+  return membership?.workspaceId ?? null;
+}
+
 export async function saveInstallationFromGitHub(
   userId: string,
   installationId: number,
@@ -176,19 +185,29 @@ export async function saveInstallationFromGitHub(
     throw new Error("Installation account not found");
   }
 
+  const workspaceId = await resolveWorkspaceIdForUser(userId);
+
   return prisma.gitHubInstallation.upsert({
     where: { userId },
     create: {
       userId,
+      workspaceId,
       installationId,
       accountLogin: account.login,
       accountType: account.type ?? "User",
     },
     update: {
+      workspaceId,
       installationId,
       accountLogin: account.login,
       accountType: account.type ?? "User",
     },
+  });
+}
+
+export async function deleteInstallationByGitHubId(installationId: number) {
+  await prisma.gitHubInstallation.deleteMany({
+    where: { installationId },
   });
 }
 
@@ -197,9 +216,8 @@ export async function syncInstallationForUser(userId: string) {
   const match = await findInstallationForUser(userId);
 
   if (!match) {
-    let installations: Awaited<ReturnType<typeof listAppInstallations>> = [];
     try {
-      installations = await listAppInstallations();
+      await listAppInstallations();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Could not list GitHub App installs";
@@ -208,21 +226,15 @@ export async function syncInstallationForUser(userId: string) {
       );
     }
 
-    const installedOn = installations
-      .map((installation) => installationAccountLogin(installation))
-      .filter(Boolean);
-
     const identityHint =
       identity.logins.length > 0
-        ? `@${identity.logins[0]}`
-        : identity.accountIds[0]
-          ? `GitHub user id ${identity.accountIds[0]}`
-          : "your GitHub account";
+        ? identity.logins[0]!
+        : identity.accountIds[0] ?? "";
 
     throw new Error(
-      installedOn.length === 0
-        ? `No installs found for this GitHub App on GitHub yet. Click Install on GitHub while signed in as ${identityHint}.`
-        : `GitHub App is installed on: ${installedOn.map((l) => `@${l}`).join(", ")} — but ShipFlow is signed in as ${identityHint}. Use the same GitHub account for both, or Install on GitHub again while signed in as ${identityHint}.`,
+      identityHint
+        ? `NO_USER_INSTALL:The GitHub App is not installed on @${identityHint} yet.`
+        : "NO_USER_INSTALL:The GitHub App is not installed on your GitHub account yet.",
     );
   }
 
@@ -243,9 +255,8 @@ export type GitHubConnectionStatus =
 export type GitHubLinkDiagnostics = {
   configError: string | null;
   signedInWithGitHub: boolean;
-  identityAccountIds: string[];
   identityLogins: string[];
-  installationsOnApp: string[];
+  yourInstallFound: boolean;
   listError: string | null;
 };
 
@@ -256,27 +267,23 @@ export async function getGitHubLinkDiagnostics(
   const githubAccount = await getGitHubOAuthAccount(userId);
   const identity = await resolveGitHubIdentity(userId);
 
-  let installationsOnApp: string[] = [];
+  let yourInstallFound = false;
   let listError: string | null = null;
 
   if (!configError) {
     try {
-      const installations = await listAppInstallations();
-      installationsOnApp = installations
-        .map((installation) => installationAccountLogin(installation))
-        .filter((login): login is string => Boolean(login));
+      yourInstallFound = Boolean(await findInstallationForUser(userId));
     } catch (error) {
       listError =
-        error instanceof Error ? error.message : "Failed to list installations";
+        error instanceof Error ? error.message : "Failed to check your installation";
     }
   }
 
   return {
     configError,
     signedInWithGitHub: Boolean(githubAccount),
-    identityAccountIds: identity.accountIds,
     identityLogins: identity.logins,
-    installationsOnApp,
+    yourInstallFound,
     listError,
   };
 }

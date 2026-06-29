@@ -8,8 +8,8 @@ AI-assisted product delivery platform for the ChaiCode hackathon — from featur
 
 ShipFlow AI runs a full delivery loop:
 
-1. **Discover** — capture feature requests (manual form, email/ticket/call intake API)
-2. **Clarify** — AI asks questions; users reply in a conversation thread
+1. **Discover** — capture feature requests (manual form, **Customer Intake** page, email/ticket/call intake API)
+2. **Clarify** — AI asks questions; **user replies auto-trigger the next AI round**; duplicate features are educated and flagged
 3. **Plan** — generate PRD → engineering tasks → team approves the plan
 4. **Build** — connect GitHub repos, track PRs, link PRs to features
 5. **Review** — AI reviews PRs against PRD/tasks (blocking vs non-blocking)
@@ -96,7 +96,8 @@ Open http://localhost:3000 → sign up → connect GitHub App → create a featu
 1. **Sign in** at `/sign-in` (GitHub or email)
 2. **Dashboard** `/dashboard` — real stats (repos, PRs, reviews, approvals)
 3. **Feature request** `/dashboard/feature-requests` — create with intake source
-4. **Clarify → PRD → Tasks** — run AI actions on feature detail page
+3b. **Customer intake** `/dashboard/intake` — email / ticket / call demo (auto-starts AI clarify)
+4. **Clarify → PRD → Tasks** — run AI actions on feature detail page (tasks via Inngest background job)
 5. **Approve plan** when status is "Awaiting Plan Approval"
 6. **PRD Editor** `/dashboard/prd` — edit generated PRD
 7. **Task board** `/dashboard/tasks` — move tasks between columns

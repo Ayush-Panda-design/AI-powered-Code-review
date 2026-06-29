@@ -9,6 +9,7 @@ export async function loadReviewContext(
       featureRequestId: null,
       featureTitle: null,
       prd: null,
+      prdMarkdown: null,
       tasks: [],
     };
   }
@@ -26,6 +27,7 @@ export async function loadReviewContext(
           userStories: true,
           acceptanceCriteria: true,
           edgeCases: true,
+          rawMarkdown: true,
         },
       },
       tasks: {
@@ -44,6 +46,7 @@ export async function loadReviewContext(
       featureRequestId: null,
       featureTitle: null,
       prd: null,
+      prdMarkdown: null,
       tasks: [],
     };
   }
@@ -51,7 +54,17 @@ export async function loadReviewContext(
   return {
     featureRequestId: feature.id,
     featureTitle: feature.title,
-    prd: feature.prd,
+    prd: feature.prd
+      ? {
+          problemStatement: feature.prd.problemStatement,
+          goals: feature.prd.goals,
+          nonGoals: feature.prd.nonGoals,
+          userStories: feature.prd.userStories,
+          acceptanceCriteria: feature.prd.acceptanceCriteria,
+          edgeCases: feature.prd.edgeCases,
+        }
+      : null,
+    prdMarkdown: feature.prd?.rawMarkdown ?? null,
     tasks: feature.tasks,
   };
 }

@@ -44,7 +44,7 @@ export function buildSyncStatusMessage(syncRun: {
   }
 
   if (syncRun.totalRepos === 0) {
-    return "No repositories found for your GitHub App installation.";
+    return "No repositories connected in ShipFlow yet. Open Repositories, click Connect on a repo, then sync again.";
   }
 
   if (syncRun.totalPRs === 0) {

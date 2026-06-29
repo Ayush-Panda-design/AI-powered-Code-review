@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { githubAppStatusStyles } from "@/features/dashboard/lib/status-styles";
+import { getSafeGitHubErrorMessage } from "@/features/github/server/github-user-errors";
 import type { GitHubLinkDiagnostics } from "@/features/github/server/installation";
 import {
   getGitHubAppConfigError,
@@ -26,28 +27,7 @@ type GitHubConnectCardProps = {
   } | null;
   signedInWithGitHub: boolean;
   error?: string | null;
-  errorDetail?: string | null;
   diagnostics?: GitHubLinkDiagnostics | null;
-};
-
-const errorMessages: Record<string, string> = {
-  missing_params:
-    "GitHub did not return installation details. On your GitHub App settings, set the Setup URL to: https://YOUR-DOMAIN/api/github/callback then click Install on GitHub again.",
-  invalid_state:
-    "Your ShipFlow session changed during the GitHub redirect. Stay signed in, then click Install on GitHub again.",
-  save_failed:
-    "ShipFlow could not save the connection. Check GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY on Vercel, redeploy, then try Install on GitHub again.",
-  link_failed:
-    "Link failed unexpectedly. Try Install on GitHub first. If that completes but you still see this, check Vercel logs.",
-  no_installation:
-    "ShipFlow cannot find a GitHub App install on your GitHub account yet. Click Install on GitHub, choose your personal account (same as sign-in), select repositories, then click Link my installation.",
-  needs_github_signin:
-    "Sign in with GitHub first (not email only), then return to this page.",
-  wrong_github_account:
-    "That installation belongs to a different GitHub account. Sign in with YOUR GitHub account, then Install on GitHub on that account only.",
-  app_misconfigured:
-    "GitHub App credentials on the server are wrong or incomplete. Fix GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY on Vercel, then redeploy.",
-  invalid_installation_id: "Enter a valid installation ID from your GitHub installation URL.",
 };
 
 function ConnectOption({
@@ -55,14 +35,21 @@ function ConnectOption({
   when,
   steps,
   action,
+  highlighted,
 }: {
   title: string;
   when: string;
   steps: string[];
   action: React.ReactNode;
+  highlighted?: boolean;
 }) {
   return (
-    <div className="flex flex-col gap-3 rounded-xl border border-border/60 p-4 text-left">
+    <div
+      className={cn(
+        "flex flex-col gap-3 rounded-xl border p-4 text-left",
+        highlighted ? "border-primary/40 bg-primary/5" : "border-border/60",
+      )}
+    >
       <div className="space-y-1">
         <p className="font-medium">{title}</p>
         <p className="text-sm text-muted-foreground">{when}</p>
@@ -82,7 +69,6 @@ export function GitHubConnectCard({
   installation,
   signedInWithGitHub,
   error,
-  errorDetail,
   diagnostics,
 }: GitHubConnectCardProps) {
   const isConnected = Boolean(installation);
@@ -91,6 +77,12 @@ export function GitHubConnectCard({
   const canInstall = Boolean(installUrl);
   const status = isConnected ? "connected" : canInstall ? "disconnected" : "error";
   const statusStyle = githubAppStatusStyles[status];
+  const safeError = getSafeGitHubErrorMessage(error, diagnostics ?? null);
+  const userLogin = diagnostics?.identityLogins[0];
+  const needsInstallFirst =
+    error === "no_installation" ||
+    error === "link_failed" ||
+    (diagnostics != null && !diagnostics.yourInstallFound);
 
   return (
     <Card>
@@ -102,9 +94,18 @@ export function GitHubConnectCard({
               GitHub App
             </CardTitle>
             <CardDescription>
-              Sign-in with GitHub only proves who you are. This step grants
-              ShipFlow permission to read PRs and repos on{" "}
-              <strong>your GitHub account only</strong>.
+              {userLogin ? (
+                <>
+                  Connect <strong>your</strong> GitHub account (
+                  <strong>@{userLogin}</strong>) — not anyone else&apos;s. Each
+                  ShipFlow user installs the app on their own GitHub.
+                </>
+              ) : (
+                <>
+                  Sign in with GitHub first, then install the app on your
+                  account only.
+                </>
+              )}
             </CardDescription>
           </div>
           <Badge
@@ -116,52 +117,45 @@ export function GitHubConnectCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4">
-        {error ? (
-          <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            <p>{errorMessages[error] ?? "Something went wrong. Please try again."}</p>
-            {errorDetail ? (
-              <p className="text-xs opacity-90">{errorDetail}</p>
+        {safeError ? (
+          <div
+            className={cn(
+              "space-y-2 rounded-lg border px-4 py-3 text-sm",
+              needsInstallFirst
+                ? "border-sky-500/30 bg-sky-500/10 text-sky-900 dark:text-sky-100"
+                : "border-destructive/30 bg-destructive/10 text-destructive",
+            )}
+          >
+            <p className="font-medium">
+              {needsInstallFirst
+                ? "Install on your GitHub account first"
+                : "Could not connect GitHub App"}
+            </p>
+            <p>{safeError.replace(/\*\*/g, "")}</p>
+            {needsInstallFirst && installUrl ? (
+              <a href={installUrl} className={buttonVariants({ size: "sm", className: "mt-2" })}>
+                Install on GitHub
+              </a>
             ) : null}
           </div>
         ) : null}
 
-        {!isConnected && diagnostics ? (
-          <details className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm">
-            <summary className="cursor-pointer font-medium">Connection diagnostics</summary>
-            <ul className="mt-3 space-y-1 text-muted-foreground">
+        {!isConnected && diagnostics && signedInWithGitHub ? (
+          <div className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm">
+            <p className="font-medium">Your connection status</p>
+            <ul className="mt-2 space-y-1 text-muted-foreground">
               <li>
-                Signed in with GitHub:{" "}
-                <strong>{diagnostics.signedInWithGitHub ? "yes" : "no"}</strong>
+                Signed in as:{" "}
+                <strong>
+                  {userLogin ? `@${userLogin}` : "GitHub (username loading…)"}
+                </strong>
               </li>
-              {diagnostics.identityLogins.length > 0 ? (
-                <li>
-                  ShipFlow sees GitHub as:{" "}
-                  <strong>
-                    {diagnostics.identityLogins.map((l) => `@${l}`).join(", ")}
-                  </strong>
-                </li>
-              ) : diagnostics.identityAccountIds.length > 0 ? (
-                <li>
-                  GitHub user id:{" "}
-                  <strong>{diagnostics.identityAccountIds.join(", ")}</strong>
-                </li>
-              ) : null}
-              {diagnostics.configError ? (
-                <li className="text-destructive">Config: {diagnostics.configError}</li>
-              ) : diagnostics.listError ? (
-                <li className="text-destructive">List installs: {diagnostics.listError}</li>
-              ) : (
-                <li>
-                  Installs on this GitHub App:{" "}
-                  <strong>
-                    {diagnostics.installationsOnApp.length > 0
-                      ? diagnostics.installationsOnApp.map((l) => `@${l}`).join(", ")
-                      : "none found"}
-                  </strong>
-                </li>
-              )}
+              <li>
+                App installed on your account:{" "}
+                <strong>{diagnostics.yourInstallFound ? "yes" : "not yet"}</strong>
+              </li>
             </ul>
-          </details>
+          </div>
         ) : null}
 
         {!signedInWithGitHub && !isConnected ? (
@@ -195,24 +189,20 @@ export function GitHubConnectCard({
           </div>
         ) : canInstall && installUrl ? (
           <div className="space-y-4">
-            <div className="rounded-lg border border-dashed border-border/60 bg-muted/30 px-4 py-3 text-sm text-muted-foreground">
-              <p className="font-medium text-foreground">Already approved on GitHub?</p>
-              <p className="mt-1">
-                If you completed the GitHub permission screen but ShipFlow still
-                shows disconnected, click <strong>Link my installation</strong>{" "}
-                below — no second trip to GitHub.
-              </p>
-            </div>
-
             <div className="grid gap-4 lg:grid-cols-2">
               <ConnectOption
+                highlighted
                 title="Install on GitHub"
-                when="Use this the first time, or if you never selected repositories on GitHub."
+                when={
+                  userLogin
+                    ? `First-time setup for @${userLogin}. Opens GitHub to approve repo access on your account.`
+                    : "First-time setup. Opens GitHub to approve repo access on your account."
+                }
                 steps={[
-                  "Opens github.com (same account you used to sign in).",
-                  "Choose your personal account (not someone else's).",
-                  "Select which repositories ShipFlow may access.",
-                  "GitHub sends you back here automatically when done.",
+                  "Stay signed in to ShipFlow as yourself.",
+                  "On GitHub, choose your personal account.",
+                  "Select which of your repositories ShipFlow may access.",
+                  "GitHub returns you here when finished.",
                 ]}
                 action={
                   <a
@@ -226,12 +216,11 @@ export function GitHubConnectCard({
 
               <ConnectOption
                 title="Link my installation"
-                when="Use this only after you already installed the app on GitHub but ShipFlow still says disconnected."
+                when="Only use this after you already completed Install on GitHub and still see disconnected."
                 steps={[
-                  "Does not open GitHub again.",
-                  "ShipFlow looks up the app install on your signed-in GitHub account.",
-                  "Connects that install to this dashboard.",
-                  "If this fails, use Install on GitHub instead (your token may need refresh — sign out and sign in with GitHub).",
+                  "Does not open GitHub.",
+                  "Looks up the install on your signed-in account only.",
+                  "If you have not installed yet, use Install on GitHub instead.",
                 ]}
                 action={
                   <form action={linkGitHubInstallation}>

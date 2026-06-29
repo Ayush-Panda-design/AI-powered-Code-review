@@ -119,8 +119,10 @@ export function ReposList({
           </EmptyMedia>
           <EmptyTitle>No repositories found</EmptyTitle>
           <EmptyDescription>
-            Grant the GitHub App access to repositories on the installation
-            page, then refresh.
+            The GitHub App is connected, but GitHub is not granting access to any
+            repositories yet. On GitHub, open your app installation settings,
+            choose <strong>All repositories</strong> or select specific repos,
+            then refresh this page.
           </EmptyDescription>
         </EmptyHeader>
       </Empty>

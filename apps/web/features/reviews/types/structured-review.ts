@@ -33,6 +33,7 @@ export type ReviewContext = {
     acceptanceCriteria: string;
     edgeCases: string;
   } | null;
+  prdMarkdown: string | null;
   tasks: Array<{ title: string; description: string | null; status: string }>;
 };
 

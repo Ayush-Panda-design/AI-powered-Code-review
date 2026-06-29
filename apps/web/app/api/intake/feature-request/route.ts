@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/db";
-import { createFeatureRequest } from "@repo/services";
+import { createFeatureRequest, queueAutoClarification } from "@repo/services";
 
 async function getOrCreateDefaultProject(workspaceId: string) {
   const existing = await prisma.project.findFirst({
@@ -70,6 +70,10 @@ export async function POST(request: NextRequest) {
     description: description.trim(),
     source,
   });
+
+  if (feature.status === "draft") {
+    await queueAutoClarification(feature.id);
+  }
 
   return NextResponse.json({
     id: feature.id,
