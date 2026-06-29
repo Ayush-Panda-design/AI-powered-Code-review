@@ -1,19 +1,12 @@
 import { Webhooks } from "@octokit/webhooks";
 import { NextResponse } from "next/server";
 
-import { savePullRequest } from "@/features/reviews/server/save-pull-request";
-import { triggerReviewJob } from "@/features/reviews/server/trigger-review";
 import {
-  REVIEWABLE_PR_ACTIONS,
-  type PullRequestWebhookPayload,
-  type ReviewablePullRequestAction,
-} from "@/features/reviews/types/review";
-
-function isReviewableAction(
-  action: string
-): action is ReviewablePullRequestAction {
-  return REVIEWABLE_PR_ACTIONS.includes(action as ReviewablePullRequestAction);
-}
+  handleInstallationEvent,
+  handleInstallationRepositoriesEvent,
+  handlePullRequestEvent,
+} from "@/features/github/server/webhook-events";
+import type { PullRequestWebhookPayload } from "@/features/reviews/types/review";
 
 export async function handleGitHubWebhook(request: Request) {
   const payload = await request.text();
@@ -28,7 +21,7 @@ export async function handleGitHubWebhook(request: Request) {
   if (!secret) {
     return NextResponse.json(
       { error: "Webhook secret not configured" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -39,54 +32,40 @@ export async function handleGitHubWebhook(request: Request) {
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
 
-  if (event !== "pull_request") {
-    return NextResponse.json({ ok: true, ignored: true });
-  }
-
-  if (process.env.NODE_ENV === "development") {
-    console.info("[github/webhook] pull_request event received");
-  }
-
-  let data: PullRequestWebhookPayload;
+  let data: unknown;
   try {
-    data = JSON.parse(payload) as PullRequestWebhookPayload;
+    data = JSON.parse(payload);
   } catch {
     return NextResponse.json({ error: "Invalid JSON payload" }, { status: 400 });
   }
 
-  if (!isReviewableAction(data.action)) {
-    return NextResponse.json({ ok: true, ignored: true });
+  if (process.env.NODE_ENV === "development") {
+    console.info(`[github/webhook] ${event ?? "unknown"} event received`);
   }
 
   try {
-    await savePullRequest(data);
-  } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("[github/webhook] save failed:", error);
-    }
-
-    return NextResponse.json(
-      { error: "Failed to save pull request" },
-      { status: 500 }
-    );
-  }
-
-  try {
-    await triggerReviewJob(data);
-
-    if (process.env.NODE_ENV === "development") {
-      console.info("[github/webhook] queued github/pr.received");
+    switch (event) {
+      case "pull_request":
+        return await handlePullRequestEvent(data as PullRequestWebhookPayload);
+      case "installation":
+        return await handleInstallationEvent(
+          data as Parameters<typeof handleInstallationEvent>[0],
+        );
+      case "installation_repositories":
+        return await handleInstallationRepositoriesEvent(
+          data as Parameters<typeof handleInstallationRepositoriesEvent>[0],
+        );
+      default:
+        return NextResponse.json({ ok: true, ignored: true });
     }
   } catch (error) {
     if (process.env.NODE_ENV === "development") {
-      console.error("[github/webhook] failed to queue review job:", error);
+      console.error(`[github/webhook] ${event} handler failed:`, error);
     }
 
     return NextResponse.json(
-      { error: "Failed to queue review job" },
-      { status: 500 }
+      { error: "Webhook handler failed" },
+      { status: 500 },
     );
   }
-
-  return NextResponse.json({ ok: true });
 }

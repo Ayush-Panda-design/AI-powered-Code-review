@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { LoadingIllustration } from "@/components/ui/loading-illustration";
 import { trpc } from "@/trpc/client";
 import { cn } from "@/lib/utils";
+import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
 
 type SyncStatus = {
   id: string;
@@ -141,8 +142,10 @@ function SyncProgressPanel({
 
 export function SyncPullRequestsButton({
   className,
+  connectedReposCount = 1,
 }: {
   className?: string;
+  connectedReposCount?: number;
 }) {
   const utils = trpc.useUtils();
   const [panelStatus, setPanelStatus] = useState<SyncStatus | null>(null);
@@ -156,6 +159,23 @@ export function SyncPullRequestsButton({
     if (syncInFlightRef.current) {
       return;
     }
+
+    if (connectedReposCount === 0) {
+      toast.error(
+        "Connect at least one repository first.",
+        {
+          description: "Open Repositories and click Connect on a repo.",
+          action: {
+            label: "Repositories",
+            onClick: () => {
+              window.location.href = `${DASHBOARD_BASE_PATH}/repositories`;
+            },
+          },
+        },
+      );
+      return;
+    }
+
     syncInFlightRef.current = true;
     setDismissedId(null);
     setIsSyncing(true);

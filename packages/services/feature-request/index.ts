@@ -105,3 +105,47 @@ export async function addClarification(
     data: { featureRequestId, role, content },
   });
 }
+
+const AUTO_CLARIFY_BLOCK_STATUSES = new Set([
+  "duplicate",
+  "shipped",
+  "rejected",
+  "clarifying",
+  "prd_generating",
+  "awaiting_prd_approval",
+  "prd_ready",
+  "planning",
+  "awaiting_plan_approval",
+  "in_development",
+  "in_review",
+  "fix_needed",
+  "release_checking",
+  "awaiting_approval",
+]);
+
+/** Queue the next AI clarification round after intake or a user reply. */
+export async function queueAutoClarification(featureRequestId: string) {
+  const feature = await prisma.featureRequest.findUnique({
+    where: { id: featureRequestId },
+    select: {
+      status: true,
+      project: { select: { workspaceId: true } },
+    },
+  });
+
+  if (!feature || AUTO_CLARIFY_BLOCK_STATUSES.has(feature.status)) {
+    return { queued: false as const };
+  }
+
+  const { assertHasCredits } = await import("../credits");
+  const { sendClarifyJob } = await import("../inngest");
+  const { AI_CREDIT_COSTS } = await import("../constants");
+
+  try {
+    await assertHasCredits(feature.project.workspaceId, AI_CREDIT_COSTS.clarify);
+    await sendClarifyJob(featureRequestId);
+    return { queued: true as const };
+  } catch {
+    return { queued: false as const };
+  }
+}

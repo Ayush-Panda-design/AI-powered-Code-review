@@ -9,6 +9,7 @@ import {
   sendGitHubSyncJob,
   sendReviewJob,
   findActiveSyncRun,
+  listConnectedRepositoriesForWorkspace,
   serializeSyncRun,
   markStaleSyncRunsFailed,
 } from "@repo/services";
@@ -398,6 +399,15 @@ export const reviewRouter = router({
   startSync: protectedProcedure.mutation(async ({ ctx }) => {
     const installation = await requireInstallation(ctx);
     const workspaceId = await requireWorkspaceId(installation);
+
+    const connected = await listConnectedRepositoriesForWorkspace(workspaceId);
+    if (connected.length === 0) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message:
+          "Connect at least one repository before syncing. Open Repositories, click Connect on a repo, then try again.",
+      });
+    }
 
     const active = await findActiveSyncRun(workspaceId);
     if (active) {

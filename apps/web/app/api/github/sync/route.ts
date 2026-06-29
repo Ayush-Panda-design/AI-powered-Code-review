@@ -58,6 +58,17 @@ export async function POST() {
   }
   const repositories = [...repoByName.values()];
 
+  if (repositories.length === 0) {
+    return NextResponse.json(
+      {
+        error:
+          "Connect at least one repository before syncing. Open Repositories, click Connect on a repo, then try Sync from GitHub again.",
+        code: "no_connected_repos",
+      },
+      { status: 400 },
+    );
+  }
+
   const syncRun = await prisma.syncRun.create({
     data: {
       workspaceId,
@@ -66,25 +77,6 @@ export async function POST() {
       totalRepos: repositories.length,
     },
   });
-
-  if (repositories.length === 0) {
-    await completeSyncRun(syncRun.id, {
-      syncedPRs: 0,
-      changedPRs: 0,
-      queuedReviews: 0,
-    });
-
-    const finished = await prisma.syncRun.findUniqueOrThrow({
-      where: { id: syncRun.id },
-    });
-
-    return NextResponse.json({
-      ok: true,
-      syncId: syncRun.id,
-      alreadyRunning: false,
-      status: serializeSyncRun(finished),
-    });
-  }
 
   try {
     const result = await syncConnectedRepositories(repositories, syncRun.id);

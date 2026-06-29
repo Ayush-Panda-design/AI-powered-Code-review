@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
+import { mapInstallErrorToCode } from "@/features/github/server/github-user-errors";
 import { saveInstallationFromGitHub } from "@/features/github/server/installation";
 import { getServerSession } from "@/lib/auth-session";
 
@@ -37,21 +38,9 @@ export async function GET(request: NextRequest) {
     if (process.env.NODE_ENV === "development") {
       console.error("[github/callback] save failed:", error);
     }
-    const message = error instanceof Error ? error.message : "Unknown error";
-    const lower = message.toLowerCase();
-    const params = new URLSearchParams();
-    params.set("detail", message.slice(0, 500));
-
-    if (
-      lower.includes("different github account") ||
-      lower.includes("signed in as")
-    ) {
-      params.set("error", "wrong_github_account");
-    } else if (lower.includes("sign in with github")) {
-      params.set("error", "needs_github_signin");
-    } else {
-      params.set("error", "save_failed");
-    }
+    const params = new URLSearchParams({
+      error: mapInstallErrorToCode(error),
+    });
 
     return NextResponse.redirect(
       new URL(
