@@ -36,9 +36,7 @@ export function GitHubSetupBanner({ status }: GitHubSetupBannerProps) {
   }
 
   const linkHint =
-    status.hint === "link"
-      ? "You may have already approved access on GitHub — open GitHub App and click Link my installation."
-      : "Open GitHub App and click Install on GitHub to grant repository access on your account.";
+    "Click Link my installation if you already approved the app on GitHub. Otherwise use Install on GitHub first.";
 
   return (
     <div className="flex flex-col gap-3 rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">

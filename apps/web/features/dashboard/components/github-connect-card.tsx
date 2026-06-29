@@ -29,15 +29,19 @@ type GitHubConnectCardProps = {
 
 const errorMessages: Record<string, string> = {
   missing_params:
-    "GitHub did not return installation details after you approved access. Click Install on GitHub again.",
+    "GitHub did not return installation details. On your GitHub App settings, set the Setup URL to: https://YOUR-DOMAIN/api/github/callback then click Install on GitHub again.",
   invalid_state:
-    "Your session changed during the GitHub redirect. Stay signed in to ShipFlow, then try again.",
+    "Your ShipFlow session changed during the GitHub redirect. Stay signed in, then click Install on GitHub again.",
   save_failed:
-    "ShipFlow could not save the connection. Check server GitHub App env vars, redeploy, then try again.",
+    "ShipFlow could not save the connection. Check GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY on Vercel, redeploy, then try Install on GitHub again.",
   link_failed:
-    "Could not link automatically. If you already approved the app on GitHub, click Link my installation. Otherwise click Install on GitHub first.",
+    "Link failed unexpectedly. Try Install on GitHub first. If that completes but you still see this, check Vercel logs.",
+  no_installation:
+    "ShipFlow cannot find a GitHub App install on your GitHub account yet. Click Install on GitHub, choose your personal account (same as sign-in), select repositories, then click Link my installation.",
+  needs_github_signin:
+    "Sign in with GitHub first (not email only), then return to this page.",
   wrong_github_account:
-    "That GitHub installation belongs to a different account. Sign in with YOUR GitHub account, then Install on GitHub and pick only your repos.",
+    "That installation belongs to a different GitHub account. Sign in with YOUR GitHub account, then Install on GitHub on that account only.",
   invalid_installation_id: "Enter a valid installation ID from your GitHub installation URL.",
 };
 

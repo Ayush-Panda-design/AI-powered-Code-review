@@ -15,11 +15,18 @@ function redirectWithGitHubError(error: unknown, fallback: string) {
   const message = error instanceof Error ? error.message.toLowerCase() : "";
 
   if (
-    message.includes("not on your github account") ||
-    message.includes("sign in with github") ||
+    message.includes("different github account") ||
     message.includes("cannot access someone else")
   ) {
     redirect(`${DASHBOARD_BASE_PATH}/github-app?error=wrong_github_account`);
+  }
+
+  if (message.includes("no github app installation found")) {
+    redirect(`${DASHBOARD_BASE_PATH}/github-app?error=no_installation`);
+  }
+
+  if (message.includes("sign in with github")) {
+    redirect(`${DASHBOARD_BASE_PATH}/github-app?error=needs_github_signin`);
   }
 
   redirect(`${DASHBOARD_BASE_PATH}/github-app?error=${fallback}`);
@@ -31,9 +38,7 @@ export async function linkGitHubInstallation() {
   try {
     await syncInstallationForUser(session.user.id);
   } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("[github/link] failed:", error);
-    }
+    console.error("[github/link] failed:", error);
     redirectWithGitHubError(error, "link_failed");
   }
 
