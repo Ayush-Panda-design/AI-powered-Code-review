@@ -61,9 +61,18 @@ const TONE_STYLES: Record<
   },
 };
 
-export function WorkflowStepper({ status }: { status: string }) {
+export function WorkflowStepper({
+  status,
+  taskGenerationActive = false,
+}: {
+  status: string;
+  /** Client-side flag while POST /generate-tasks is in flight. */
+  taskGenerationActive?: boolean;
+}) {
   const journey = getWorkflowJourney(status);
   const tone = TONE_STYLES[journey.nextAction.tone];
+  const showIndeterminate =
+    journey.nextAction.inFlight || (taskGenerationActive && status === "planning");
 
   return (
     <Card className="overflow-hidden">
@@ -74,14 +83,21 @@ export function WorkflowStepper({ status }: { status: string }) {
               Delivery progress
             </span>
             <span className="text-xs font-medium text-muted-foreground">
-              {journey.percent}%
+              {showIndeterminate ? "Working…" : `${journey.percent}%`}
             </span>
           </div>
-          <div className="h-1.5 overflow-hidden rounded-full bg-muted">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-status-success via-status-warning to-status-progress transition-all duration-700 ease-out"
-              style={{ width: `${journey.percent}%` }}
-            />
+          <div className="relative h-1.5 overflow-hidden rounded-full bg-muted">
+            {showIndeterminate ? (
+              <div
+                className="absolute inset-y-0 w-1/3 rounded-full bg-gradient-to-r from-status-success via-status-warning to-status-progress motion-safe:animate-[task-gen-slide_1.4s_ease-in-out_infinite]"
+                aria-hidden
+              />
+            ) : (
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-status-success via-status-warning to-status-progress transition-all duration-700 ease-out"
+                style={{ width: `${journey.percent}%` }}
+              />
+            )}
           </div>
         </div>
 

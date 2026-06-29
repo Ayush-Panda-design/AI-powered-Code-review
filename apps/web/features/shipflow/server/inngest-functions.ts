@@ -16,6 +16,7 @@ import {
   findSimilarFeatureRequests,
   formatSimilarFeaturesForClarify,
 } from "./feature-similarity";
+import { fetchRepoContext, formatRepoContextForPrompt } from "./repo-context";
 
 /** Deducts AI_CREDIT_COSTS.clarify / .prd via chargeFeatureCreditsForJob before AI work. */
 export const clarifyFeatureRequest = inngest.createFunction(
@@ -43,10 +44,28 @@ export const clarifyFeatureRequest = inngest.createFunction(
     );
     const similarContext = formatSimilarFeaturesForClarify(similar);
 
+    // Fetch repo context if a target repository is assigned.
+    const targetRepo = feature.targetRepository;
+    const repoCtx = targetRepo
+      ? await fetchRepoContext(
+          targetRepo.installationId,
+          targetRepo.repoFullName,
+          targetRepo.defaultBranch,
+        )
+      : null;
+    const repoContext = repoCtx ? formatRepoContextForPrompt(repoCtx) : "";
+
     const questions = await generateClarificationQuestions(
       feature.title,
       feature.description,
-      similarContext,
+      {
+        previousMessages: feature.clarifications.map((c) => ({
+          role: c.role,
+          content: c.content,
+        })),
+        repoContext,
+        similarFeaturesContext: similarContext,
+      },
     );
 
     await addClarification(featureRequestId, "assistant", questions);

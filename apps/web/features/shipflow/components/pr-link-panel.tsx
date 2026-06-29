@@ -61,12 +61,14 @@ function LinkablePrEmptyState({
         <p className="font-medium text-foreground">No pull requests synced yet</p>
         <p className="mt-1 text-xs">
           Open a PR on GitHub in{" "}
-          {connectedRepos.length > 0 ? connectedRepos.join(", ") : "a connected repo"}, then run{" "}
-          <strong>Sync from GitHub</strong> on the{" "}
+          {connectedRepos.length > 0 ? connectedRepos.join(", ") : "a connected repo"}, then click{" "}
+          <strong>Sync from GitHub</strong> above (or on the{" "}
           <Link href={`${DASHBOARD_BASE_PATH}/pull-requests`} className="text-primary underline">
             Pull Requests
           </Link>{" "}
-          page.
+          page). Auto-link works when the branch is{" "}
+          <code>feature/&lt;feature-id&gt;</code> or the title includes{" "}
+          <code>[shipflow:&lt;feature-id&gt;]</code>.
         </p>
       </div>
     );
@@ -134,6 +136,8 @@ export function PrLinkPanel({
           changed?: number;
           synced?: number;
           repos?: number;
+          failedRepos?: number;
+          reason?: string;
           error?: string;
         } | null;
 
@@ -150,8 +154,12 @@ export function PrLinkPanel({
 
         if (!options?.silent) {
           toast.dismiss(toastId);
-          if ((result.repos ?? 0) === 0) {
-            toast.info("No connected repos to sync for this feature's project.");
+          if (result.reason === "no_connected_repos" || (result.repos ?? 0) === 0) {
+            toast.info("No repositories connected to this feature's project.");
+          } else if ((result.failedRepos ?? 0) > 0 && (result.changed ?? 0) === 0) {
+            toast.error(
+              "Could not reach GitHub for connected repos. Check the GitHub App installation.",
+            );
           } else if ((result.changed ?? 0) > 0) {
             toast.success(`Synced — ${result.changed} pull request(s) updated.`);
           } else {
@@ -294,8 +302,8 @@ export function PrLinkPanel({
         <div className="space-y-2 border-t pt-4">
           <p className="text-sm font-medium">Link pull request manually</p>
           <p className="text-xs text-muted-foreground">
-            Auto-link via branch <code>feature/&lt;id&gt;</code> or title{" "}
-            <code>[shipflow:&lt;id&gt;]</code>, or pick from connected repos:
+            Auto-link via branch <code>feature/{featureRequestId}</code> or title{" "}
+            <code>[shipflow:{featureRequestId}]</code>, or pick from connected repos:
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {isLoading ? (

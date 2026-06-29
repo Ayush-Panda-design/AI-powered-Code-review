@@ -15,7 +15,16 @@ export async function getFeatureRequest(id: string) {
   return prisma.featureRequest.findUnique({
     where: { id },
     include: {
-      project: { include: { workspace: true } },
+      project: {
+        include: {
+          workspace: true,
+          repositories: {
+            orderBy: { createdAt: "asc" },
+            select: { id: true, repoFullName: true, defaultBranch: true },
+          },
+        },
+      },
+      targetRepository: { select: { id: true, repoFullName: true, defaultBranch: true, installationId: true } },
       clarifications: { orderBy: { createdAt: "asc" } },
       prd: true,
       tasks: { orderBy: [{ status: "asc" }, { order: "asc" }] },

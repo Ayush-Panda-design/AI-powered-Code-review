@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { getInstallationForUser } from "@/features/github/server/installation";
-import { syncAllRepositories } from "@/features/reviews/server/sync-github-worker";
+import { syncConnectedRepositories } from "@/features/reviews/server/sync-github-worker";
 import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
 
@@ -25,16 +24,13 @@ export async function POST(request: Request) {
     );
   }
 
-  const installation = await getInstallationForUser(session.user.id);
-  if (!installation) {
-    return NextResponse.json(
-      { error: "GitHub App is not connected." },
-      { status: 400 },
-    );
-  }
-
-  const feature = await prisma.featureRequest.findUnique({
-    where: { id: featureRequestId },
+  const feature = await prisma.featureRequest.findFirst({
+    where: {
+      id: featureRequestId,
+      project: {
+        workspace: { members: { some: { userId: session.user.id } } },
+      },
+    },
     select: {
       project: {
         select: {
@@ -50,26 +46,30 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Feature not found." }, { status: 404 });
   }
 
-  // Only sync repos the requesting user's installation can access.
-  const repositories = feature.project.repositories
-    .filter((repo) => repo.installationId === installation.installationId)
-    .map((repo) => ({ full_name: repo.repoFullName }));
+  const repositories = feature.project.repositories.map((repo) => ({
+    full_name: repo.repoFullName,
+    installationId: repo.installationId,
+  }));
 
   if (repositories.length === 0) {
-    return NextResponse.json({ ok: true, synced: 0, changed: 0, repos: 0 });
+    return NextResponse.json({
+      ok: true,
+      synced: 0,
+      changed: 0,
+      repos: 0,
+      reason: "no_connected_repos" as const,
+    });
   }
 
   try {
-    const result = await syncAllRepositories({
-      installationId: installation.installationId,
-      repositories,
-    });
+    const result = await syncConnectedRepositories(repositories);
 
     return NextResponse.json({
       ok: true,
       synced: result.synced,
       changed: result.changed,
       repos: repositories.length,
+      failedRepos: result.failedRepos,
     });
   } catch (error) {
     return NextResponse.json(

@@ -16,6 +16,7 @@ export type ShipflowPrdEvent = { featureRequestId: string };
 export type ShipflowTasksEvent = { featureRequestId: string };
 export type ShipflowReleaseReadinessEvent = { featureRequestId: string };
 export type ShipflowCodegenEvent = { taskId: string };
+export type ShipflowOpenDraftPrEvent = { taskId: string };
 export type GitHubSyncRequestedEvent = {
   syncRunId: string;
   installationId: number;
@@ -65,6 +66,13 @@ export async function sendCodegenJob(taskId: string) {
   return inngest.send({
     name: "shipflow/task.codegen",
     data: { taskId } satisfies ShipflowCodegenEvent,
+  });
+}
+
+export async function sendOpenDraftPrJob(taskId: string) {
+  return inngest.send({
+    name: "shipflow/task.open-draft-pr",
+    data: { taskId } satisfies ShipflowOpenDraftPrEvent,
   });
 }
 

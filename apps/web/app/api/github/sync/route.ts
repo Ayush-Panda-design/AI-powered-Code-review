@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { getInstallationForUser } from "@/features/github/server/installation";
-import { syncAllRepositories } from "@/features/reviews/server/sync-github-worker";
+import { syncConnectedRepositories } from "@/features/reviews/server/sync-github-worker";
 import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
 import {
@@ -49,8 +49,14 @@ export async function POST() {
   }
 
   const connected = await listConnectedRepositoriesForWorkspace(workspaceId);
-  const repoNames = [...new Set(connected.map((repo) => repo.repoFullName))];
-  const repositories = repoNames.map((full_name) => ({ full_name }));
+  const repoByName = new Map<string, { full_name: string; installationId: number }>();
+  for (const repo of connected) {
+    repoByName.set(repo.repoFullName, {
+      full_name: repo.repoFullName,
+      installationId: repo.installationId,
+    });
+  }
+  const repositories = [...repoByName.values()];
 
   const syncRun = await prisma.syncRun.create({
     data: {
@@ -81,11 +87,7 @@ export async function POST() {
   }
 
   try {
-    const result = await syncAllRepositories({
-      installationId: installation.installationId,
-      repositories,
-      syncRunId: syncRun.id,
-    });
+    const result = await syncConnectedRepositories(repositories, syncRun.id);
 
     if (result.failedRepos === result.totalRepos && result.totalRepos > 0) {
       throw new Error(

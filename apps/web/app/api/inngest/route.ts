@@ -8,7 +8,7 @@ import {
   clarifyFeatureRequest,
   generatePrd,
 } from "@/features/shipflow/server/inngest-functions";
-import { generateTaskCode } from "@/features/shipflow/server/codegen-inngest";
+import { generateTaskCode, openTaskDraftPr } from "@/features/shipflow/server/codegen-inngest";
 import { checkReleaseReadiness } from "@/features/shipflow/server/release-readiness-function";
 import { generateTasks } from "@/features/shipflow/server/task-inngest";
 
@@ -21,6 +21,7 @@ export const { GET, POST, PUT } = serve({
     generateTasks,
     checkReleaseReadiness,
     generateTaskCode,
+    openTaskDraftPr,
     checkStalePullRequests,
     syncGitHubPullRequests,
   ],
