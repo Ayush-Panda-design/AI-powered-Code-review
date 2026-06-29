@@ -220,10 +220,33 @@ export function TaskBoard({ projectId, fromFeatureId }: TaskBoardProps) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ projectId }),
       });
-      const data = (await res.json().catch(() => null)) as
-        | { ok?: boolean; checked?: number; updated?: number; error?: string } | null;
-      if (!res.ok || !data?.ok) throw new Error(data?.error ?? "Could not refresh.");
-      toast.success(!data.checked ? "No open draft PRs to check." : `Checked ${data.checked} PR${data.checked === 1 ? "" : "s"} · ${data.updated} updated`);
+
+      const contentType = res.headers.get("content-type") ?? "";
+      if (!contentType.includes("application/json")) {
+        throw new Error("Unexpected response from server.");
+      }
+
+      let data: {
+        ok?: boolean;
+        checked?: number;
+        updated?: number;
+        error?: string;
+      };
+      try {
+        data = (await res.json()) as typeof data;
+      } catch {
+        throw new Error("Could not parse server response.");
+      }
+
+      if (!res.ok || !data.ok) {
+        throw new Error(data.error ?? "Could not refresh.");
+      }
+
+      toast.success(
+        !data.checked
+          ? "No open draft PRs to check."
+          : `Checked ${data.checked} PR${data.checked === 1 ? "" : "s"} · ${data.updated} updated`,
+      );
       await invalidate();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not refresh PR status.");
