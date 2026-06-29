@@ -29,9 +29,14 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
     <Card className="w-full max-w-md">
       <CardHeader className="text-center">
         <CardTitle>Sign in</CardTitle>
-        <CardDescription>
-          Sign in with GitHub for full access (repos, PRs, AI reviews), or use
-          email for the dashboard only.
+        <CardDescription className="text-left sm:text-center">
+          <span className="block">
+            <strong>GitHub</strong> — full access: repos, pull requests, and AI reviews.
+          </span>
+          <span className="mt-2 block text-muted-foreground">
+            <strong>Email</strong> — planning only: features, PRDs, tasks, and approvals.
+            Connect GitHub later from the dashboard Get started guide.
+          </span>
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">

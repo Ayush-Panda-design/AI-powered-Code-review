@@ -1,8 +1,8 @@
 import { DashboardShell } from "@/features/dashboard/components/dashboard-shell";
-import { GitHubSetupBanner } from "@/features/dashboard/components/github-setup-banner";
+import { OnboardingBanner } from "@/features/dashboard/components/onboarding-banner";
 import { ensureWorkspaceAction } from "@/lib/actions/shipflow";
 import { requireSession } from "@/lib/auth-session";
-import { getGitHubConnectionStatus } from "@/features/github/server/installation";
+import { getOnboardingState } from "@/features/dashboard/server/onboarding-state";
 import { listWorkspacesForUser } from "@repo/services";
 
 export default async function DashboardLayout({
@@ -13,7 +13,7 @@ export default async function DashboardLayout({
   const session = await requireSession("/dashboard");
   const activeWorkspace = await ensureWorkspaceAction();
   const workspaces = await listWorkspacesForUser(session.user.id);
-  const githubStatus = await getGitHubConnectionStatus(session.user.id);
+  const onboarding = await getOnboardingState(session.user.id, activeWorkspace.id);
 
   return (
     <DashboardShell
@@ -24,7 +24,7 @@ export default async function DashboardLayout({
       }))}
       activeWorkspaceId={activeWorkspace.id}
     >
-      <GitHubSetupBanner status={githubStatus} />
+      <OnboardingBanner state={onboarding} />
       {children}
     </DashboardShell>
   );

@@ -1,7 +1,12 @@
 import { Octokit } from "octokit";
 
-import { getGitHubApp } from "@/features/github/utils/github-app";
+import { getGitHubApp, getGitHubAppConfigError } from "@/features/github/utils/github-app";
 import { prisma } from "@/lib/db";
+
+type GitHubIdentity = {
+  accountIds: string[];
+  logins: string[];
+};
 
 async function getGitHubOAuthAccount(userId: string) {
   return prisma.account.findFirst({
@@ -10,38 +15,92 @@ async function getGitHubOAuthAccount(userId: string) {
   });
 }
 
-async function listInstallationsAccessibleToUser(userId: string) {
-  const githubAccount = await getGitHubOAuthAccount(userId);
+function githubIdFromAvatar(image: string | null | undefined) {
+  const match = image?.match(/avatars\.githubusercontent\.com\/u\/(\d+)/i);
+  return match?.[1] ?? null;
+}
 
-  if (!githubAccount?.accountId) {
+async function resolveGitHubIdentity(userId: string): Promise<GitHubIdentity> {
+  const [githubAccount, user] = await Promise.all([
+    getGitHubOAuthAccount(userId),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { image: true },
+    }),
+  ]);
+
+  const accountIds = new Set<string>();
+  const logins = new Set<string>();
+
+  if (githubAccount?.accountId?.trim()) {
+    accountIds.add(githubAccount.accountId.trim());
+  }
+
+  const avatarId = githubIdFromAvatar(user?.image);
+  if (avatarId) {
+    accountIds.add(avatarId);
+  }
+
+  if (githubAccount?.accessToken) {
+    try {
+      const userOctokit = new Octokit({ auth: githubAccount.accessToken });
+      const { data } = await userOctokit.rest.users.getAuthenticated();
+      accountIds.add(String(data.id));
+      if (data.login) {
+        logins.add(data.login.toLowerCase());
+      }
+    } catch {
+      // OAuth token may be expired; id matching still works via accountId/avatar.
+    }
+  }
+
+  return {
+    accountIds: [...accountIds],
+    logins: [...logins],
+  };
+}
+
+function installationAccountLogin(installation: {
+  account?: { login?: string | null } | null;
+}) {
+  const login = installation.account?.login;
+  return login ? login.toLowerCase() : null;
+}
+
+function installationMatchesIdentity(
+  installation: { account?: { id?: number | null; login?: string | null } | null },
+  identity: GitHubIdentity,
+) {
+  const accountId = installation.account?.id;
+  if (accountId != null && identity.accountIds.includes(String(accountId))) {
+    return true;
+  }
+
+  const login = installationAccountLogin(installation);
+  return login != null && identity.logins.includes(login);
+}
+
+async function listAppInstallations() {
+  const app = getGitHubApp();
+  return app.octokit.paginate(app.octokit.rest.apps.listInstallations, {
+    per_page: 100,
+  });
+}
+
+async function findInstallationForUser(userId: string) {
+  const identity = await resolveGitHubIdentity(userId);
+
+  if (identity.accountIds.length === 0 && identity.logins.length === 0) {
     throw new Error(
       "Sign in with GitHub first, then install the GitHub App on your account.",
     );
   }
 
-  if (!githubAccount.accessToken) {
-    throw new Error(
-      "GitHub access expired. Sign out and sign in with GitHub again, then reconnect the app.",
-    );
-  }
+  const installations = await listAppInstallations();
 
-  const appId = process.env.GITHUB_APP_ID?.trim();
-  if (!appId) {
-    throw new Error("GITHUB_APP_ID is not configured");
-  }
-
-  const userOctokit = new Octokit({ auth: githubAccount.accessToken });
-  const installations = await userOctokit.paginate(
-    userOctokit.rest.apps.listInstallationsForAuthenticatedUser,
-    { per_page: 100 },
+  return installations.find((installation) =>
+    installationMatchesIdentity(installation, identity),
   );
-
-  return {
-    githubAccount,
-    installations: installations.filter(
-      (installation) => String(installation.app_id) === appId,
-    ),
-  };
 }
 
 async function getInstallationAccount(installationId: number) {
@@ -62,14 +121,10 @@ async function getInstallationAccount(installationId: number) {
   };
 }
 
-/**
- * Verifies an installation belongs to the signed-in user.
- * Personal accounts are checked via the GitHub App (no user OAuth token needed).
- */
 async function assertUserOwnsInstallation(userId: string, installationId: number) {
-  const githubAccount = await getGitHubOAuthAccount(userId);
+  const identity = await resolveGitHubIdentity(userId);
 
-  if (!githubAccount?.accountId) {
+  if (identity.accountIds.length === 0 && identity.logins.length === 0) {
     throw new Error(
       "Sign in with GitHub first, then install the GitHub App on your account.",
     );
@@ -77,25 +132,17 @@ async function assertUserOwnsInstallation(userId: string, installationId: number
 
   const account = await getInstallationAccount(installationId);
   if (!account) {
-    throw new Error("GitHub App installation not found.");
+    throw new Error("GitHub App installation not found on GitHub.");
   }
 
-  if (account.id === githubAccount.accountId) {
-    return;
-  }
+  const matches =
+    identity.accountIds.includes(account.id) ||
+    (account.login != null &&
+      identity.logins.includes(account.login.toLowerCase()));
 
-  if (!githubAccount.accessToken) {
+  if (!matches) {
     throw new Error(
-      "This installation is on a different GitHub account, or your GitHub session expired. Sign out and sign in with GitHub again.",
-    );
-  }
-
-  const { installations } = await listInstallationsAccessibleToUser(userId);
-  const owned = installations.some((installation) => installation.id === installationId);
-
-  if (!owned) {
-    throw new Error(
-      "This GitHub App installation is not on your GitHub account. Install the app on your own account — you cannot access someone else's repositories.",
+      `This installation is on @${account.login}, but your ShipFlow login is tied to a different GitHub account. Sign in with the matching GitHub account.`,
     );
   }
 }
@@ -146,38 +193,36 @@ export async function saveInstallationFromGitHub(
 }
 
 export async function syncInstallationForUser(userId: string) {
-  const githubAccount = await getGitHubOAuthAccount(userId);
-
-  if (!githubAccount?.accountId) {
-    throw new Error(
-      "Sign in with GitHub first, then install the GitHub App on your account.",
-    );
-  }
-
-  if (!githubAccount.accessToken) {
-    throw new Error(
-      "GitHub access expired. Sign out and sign in with GitHub again, then click Link my installation.",
-    );
-  }
-
-  const { installations } = await listInstallationsAccessibleToUser(userId);
-
-  if (installations.length === 0) {
-    throw new Error(
-      "No GitHub App installation found on your GitHub account. Click Install on GitHub first.",
-    );
-  }
-
-  const personal = installations.find((installation) => {
-    const accountId = installation.account?.id;
-    return accountId != null && String(accountId) === githubAccount.accountId;
-  });
-
-  const match = personal ?? (installations.length === 1 ? installations[0]! : null);
+  const identity = await resolveGitHubIdentity(userId);
+  const match = await findInstallationForUser(userId);
 
   if (!match) {
+    let installations: Awaited<ReturnType<typeof listAppInstallations>> = [];
+    try {
+      installations = await listAppInstallations();
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Could not list GitHub App installs";
+      throw new Error(
+        `GitHub App server misconfigured: ${message}. Check GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY on Vercel.`,
+      );
+    }
+
+    const installedOn = installations
+      .map((installation) => installationAccountLogin(installation))
+      .filter(Boolean);
+
+    const identityHint =
+      identity.logins.length > 0
+        ? `@${identity.logins[0]}`
+        : identity.accountIds[0]
+          ? `GitHub user id ${identity.accountIds[0]}`
+          : "your GitHub account";
+
     throw new Error(
-      "Multiple GitHub App installations found. Use Install on GitHub and pick your personal account, or your org if you only use one org.",
+      installedOn.length === 0
+        ? `No installs found for this GitHub App on GitHub yet. Click Install on GitHub while signed in as ${identityHint}.`
+        : `GitHub App is installed on: ${installedOn.map((l) => `@${l}`).join(", ")} — but ShipFlow is signed in as ${identityHint}. Use the same GitHub account for both, or Install on GitHub again while signed in as ${identityHint}.`,
     );
   }
 
@@ -192,19 +237,54 @@ export async function deleteInstallationForUser(userId: string) {
 
 export type GitHubConnectionStatus =
   | { state: "connected"; accountLogin: string }
-  | { state: "needs_install"; signedInWithGitHub: true; hint: "install" | "link" }
+  | { state: "needs_install"; signedInWithGitHub: true }
   | { state: "needs_github_signin" };
 
-/** Silently link if the user already installed the GitHub App on their signed-in account. */
+export type GitHubLinkDiagnostics = {
+  configError: string | null;
+  signedInWithGitHub: boolean;
+  identityAccountIds: string[];
+  identityLogins: string[];
+  installationsOnApp: string[];
+  listError: string | null;
+};
+
+export async function getGitHubLinkDiagnostics(
+  userId: string,
+): Promise<GitHubLinkDiagnostics> {
+  const configError = getGitHubAppConfigError();
+  const githubAccount = await getGitHubOAuthAccount(userId);
+  const identity = await resolveGitHubIdentity(userId);
+
+  let installationsOnApp: string[] = [];
+  let listError: string | null = null;
+
+  if (!configError) {
+    try {
+      const installations = await listAppInstallations();
+      installationsOnApp = installations
+        .map((installation) => installationAccountLogin(installation))
+        .filter((login): login is string => Boolean(login));
+    } catch (error) {
+      listError =
+        error instanceof Error ? error.message : "Failed to list installations";
+    }
+  }
+
+  return {
+    configError,
+    signedInWithGitHub: Boolean(githubAccount),
+    identityAccountIds: identity.accountIds,
+    identityLogins: identity.logins,
+    installationsOnApp,
+    listError,
+  };
+}
+
 export async function tryAutoLinkGitHubInstallation(userId: string) {
   const existing = await getInstallationForUser(userId);
   if (existing) {
     return existing;
-  }
-
-  const githubAccount = await getGitHubOAuthAccount(userId);
-  if (!githubAccount?.accessToken) {
-    return null;
   }
 
   try {
@@ -230,9 +310,5 @@ export async function getGitHubConnectionStatus(
     return { state: "needs_github_signin" };
   }
 
-  return {
-    state: "needs_install",
-    signedInWithGitHub: true,
-    hint: githubAccount.accessToken ? "link" : "install",
-  };
+  return { state: "needs_install", signedInWithGitHub: true };
 }

@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { githubAppStatusStyles } from "@/features/dashboard/lib/status-styles";
+import type { GitHubLinkDiagnostics } from "@/features/github/server/installation";
 import {
   getGitHubAppConfigError,
   getGitHubInstallUrl,
@@ -25,19 +26,27 @@ type GitHubConnectCardProps = {
   } | null;
   signedInWithGitHub: boolean;
   error?: string | null;
+  errorDetail?: string | null;
+  diagnostics?: GitHubLinkDiagnostics | null;
 };
 
 const errorMessages: Record<string, string> = {
   missing_params:
-    "GitHub did not return installation details after you approved access. Click Install on GitHub again.",
+    "GitHub did not return installation details. On your GitHub App settings, set the Setup URL to: https://YOUR-DOMAIN/api/github/callback then click Install on GitHub again.",
   invalid_state:
-    "Your session changed during the GitHub redirect. Stay signed in to ShipFlow, then try again.",
+    "Your ShipFlow session changed during the GitHub redirect. Stay signed in, then click Install on GitHub again.",
   save_failed:
-    "ShipFlow could not save the connection. Check server GitHub App env vars, redeploy, then try again.",
+    "ShipFlow could not save the connection. Check GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY on Vercel, redeploy, then try Install on GitHub again.",
   link_failed:
-    "Could not link automatically. If you already approved the app on GitHub, click Link my installation. Otherwise click Install on GitHub first.",
+    "Link failed unexpectedly. Try Install on GitHub first. If that completes but you still see this, check Vercel logs.",
+  no_installation:
+    "ShipFlow cannot find a GitHub App install on your GitHub account yet. Click Install on GitHub, choose your personal account (same as sign-in), select repositories, then click Link my installation.",
+  needs_github_signin:
+    "Sign in with GitHub first (not email only), then return to this page.",
   wrong_github_account:
-    "That GitHub installation belongs to a different account. Sign in with YOUR GitHub account, then Install on GitHub and pick only your repos.",
+    "That installation belongs to a different GitHub account. Sign in with YOUR GitHub account, then Install on GitHub on that account only.",
+  app_misconfigured:
+    "GitHub App credentials on the server are wrong or incomplete. Fix GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY on Vercel, then redeploy.",
   invalid_installation_id: "Enter a valid installation ID from your GitHub installation URL.",
 };
 
@@ -73,6 +82,8 @@ export function GitHubConnectCard({
   installation,
   signedInWithGitHub,
   error,
+  errorDetail,
+  diagnostics,
 }: GitHubConnectCardProps) {
   const isConnected = Boolean(installation);
   const configError = getGitHubAppConfigError();
@@ -106,9 +117,51 @@ export function GitHubConnectCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {errorMessages[error] ?? "Something went wrong. Please try again."}
-          </p>
+          <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <p>{errorMessages[error] ?? "Something went wrong. Please try again."}</p>
+            {errorDetail ? (
+              <p className="text-xs opacity-90">{errorDetail}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!isConnected && diagnostics ? (
+          <details className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm">
+            <summary className="cursor-pointer font-medium">Connection diagnostics</summary>
+            <ul className="mt-3 space-y-1 text-muted-foreground">
+              <li>
+                Signed in with GitHub:{" "}
+                <strong>{diagnostics.signedInWithGitHub ? "yes" : "no"}</strong>
+              </li>
+              {diagnostics.identityLogins.length > 0 ? (
+                <li>
+                  ShipFlow sees GitHub as:{" "}
+                  <strong>
+                    {diagnostics.identityLogins.map((l) => `@${l}`).join(", ")}
+                  </strong>
+                </li>
+              ) : diagnostics.identityAccountIds.length > 0 ? (
+                <li>
+                  GitHub user id:{" "}
+                  <strong>{diagnostics.identityAccountIds.join(", ")}</strong>
+                </li>
+              ) : null}
+              {diagnostics.configError ? (
+                <li className="text-destructive">Config: {diagnostics.configError}</li>
+              ) : diagnostics.listError ? (
+                <li className="text-destructive">List installs: {diagnostics.listError}</li>
+              ) : (
+                <li>
+                  Installs on this GitHub App:{" "}
+                  <strong>
+                    {diagnostics.installationsOnApp.length > 0
+                      ? diagnostics.installationsOnApp.map((l) => `@${l}`).join(", ")
+                      : "none found"}
+                  </strong>
+                </li>
+              )}
+            </ul>
+          </details>
         ) : null}
 
         {!signedInWithGitHub && !isConnected ? (
