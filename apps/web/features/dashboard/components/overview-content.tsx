@@ -1,5 +1,7 @@
 import Link from "next/link";
 
+import { OnboardingGuide } from "@/features/dashboard/components/onboarding-guide";
+
 import {
   Card,
   CardContent,
@@ -11,13 +13,20 @@ import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { OverviewRecentReviews } from "@/features/dashboard/components/overview-recent-reviews";
 import type { OverviewData } from "@/features/dashboard/server/overview-data";
+import type { OnboardingState } from "@/features/dashboard/server/onboarding-state";
 import {
   githubAppStatusStyles,
 } from "@/features/dashboard/lib/status-styles";
 import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
 import { cn } from "@/lib/utils";
 
-export function OverviewContent({ data }: { data: OverviewData }) {
+export function OverviewContent({
+  data,
+  onboarding,
+}: {
+  data: OverviewData;
+  onboarding: OnboardingState;
+}) {
   const stats = [
     {
       title: "Connected repositories",
@@ -53,6 +62,8 @@ export function OverviewContent({ data }: { data: OverviewData }) {
           ShipFlow delivery pipeline at a glance
         </p>
       </div>
+
+      <OnboardingGuide state={onboarding} variant="full" />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {stats.map((stat) => (

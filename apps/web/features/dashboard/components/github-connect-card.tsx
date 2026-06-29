@@ -10,6 +10,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { githubAppStatusStyles } from "@/features/dashboard/lib/status-styles";
+import type { GitHubLinkDiagnostics } from "@/features/github/server/installation";
 import {
   getGitHubAppConfigError,
   getGitHubInstallUrl,
@@ -25,6 +26,8 @@ type GitHubConnectCardProps = {
   } | null;
   signedInWithGitHub: boolean;
   error?: string | null;
+  errorDetail?: string | null;
+  diagnostics?: GitHubLinkDiagnostics | null;
 };
 
 const errorMessages: Record<string, string> = {
@@ -42,6 +45,8 @@ const errorMessages: Record<string, string> = {
     "Sign in with GitHub first (not email only), then return to this page.",
   wrong_github_account:
     "That installation belongs to a different GitHub account. Sign in with YOUR GitHub account, then Install on GitHub on that account only.",
+  app_misconfigured:
+    "GitHub App credentials on the server are wrong or incomplete. Fix GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY on Vercel, then redeploy.",
   invalid_installation_id: "Enter a valid installation ID from your GitHub installation URL.",
 };
 
@@ -77,6 +82,8 @@ export function GitHubConnectCard({
   installation,
   signedInWithGitHub,
   error,
+  errorDetail,
+  diagnostics,
 }: GitHubConnectCardProps) {
   const isConnected = Boolean(installation);
   const configError = getGitHubAppConfigError();
@@ -110,9 +117,51 @@ export function GitHubConnectCard({
       </CardHeader>
       <CardContent className="space-y-4">
         {error ? (
-          <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
-            {errorMessages[error] ?? "Something went wrong. Please try again."}
-          </p>
+          <div className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+            <p>{errorMessages[error] ?? "Something went wrong. Please try again."}</p>
+            {errorDetail ? (
+              <p className="text-xs opacity-90">{errorDetail}</p>
+            ) : null}
+          </div>
+        ) : null}
+
+        {!isConnected && diagnostics ? (
+          <details className="rounded-lg border border-border/60 bg-muted/20 px-4 py-3 text-sm">
+            <summary className="cursor-pointer font-medium">Connection diagnostics</summary>
+            <ul className="mt-3 space-y-1 text-muted-foreground">
+              <li>
+                Signed in with GitHub:{" "}
+                <strong>{diagnostics.signedInWithGitHub ? "yes" : "no"}</strong>
+              </li>
+              {diagnostics.identityLogins.length > 0 ? (
+                <li>
+                  ShipFlow sees GitHub as:{" "}
+                  <strong>
+                    {diagnostics.identityLogins.map((l) => `@${l}`).join(", ")}
+                  </strong>
+                </li>
+              ) : diagnostics.identityAccountIds.length > 0 ? (
+                <li>
+                  GitHub user id:{" "}
+                  <strong>{diagnostics.identityAccountIds.join(", ")}</strong>
+                </li>
+              ) : null}
+              {diagnostics.configError ? (
+                <li className="text-destructive">Config: {diagnostics.configError}</li>
+              ) : diagnostics.listError ? (
+                <li className="text-destructive">List installs: {diagnostics.listError}</li>
+              ) : (
+                <li>
+                  Installs on this GitHub App:{" "}
+                  <strong>
+                    {diagnostics.installationsOnApp.length > 0
+                      ? diagnostics.installationsOnApp.map((l) => `@${l}`).join(", ")
+                      : "none found"}
+                  </strong>
+                </li>
+              )}
+            </ul>
+          </details>
         ) : null}
 
         {!signedInWithGitHub && !isConnected ? (

@@ -12,24 +12,22 @@ import {
 import { requireSession } from "@/lib/auth-session";
 
 function redirectWithGitHubError(error: unknown, fallback: string) {
-  const message = error instanceof Error ? error.message.toLowerCase() : "";
+  const message = error instanceof Error ? error.message : "Unknown error";
+  const lower = message.toLowerCase();
+  const params = new URLSearchParams({ error: fallback });
+  params.set("detail", message.slice(0, 500));
 
-  if (
-    message.includes("different github account") ||
-    message.includes("cannot access someone else")
-  ) {
-    redirect(`${DASHBOARD_BASE_PATH}/github-app?error=wrong_github_account`);
+  if (lower.includes("different github account") || lower.includes("signed in as")) {
+    params.set("error", "wrong_github_account");
+  } else if (lower.includes("no installs found") || lower.includes("installed on:")) {
+    params.set("error", "no_installation");
+  } else if (lower.includes("sign in with github")) {
+    params.set("error", "needs_github_signin");
+  } else if (lower.includes("misconfigured")) {
+    params.set("error", "app_misconfigured");
   }
 
-  if (message.includes("no github app installation found")) {
-    redirect(`${DASHBOARD_BASE_PATH}/github-app?error=no_installation`);
-  }
-
-  if (message.includes("sign in with github")) {
-    redirect(`${DASHBOARD_BASE_PATH}/github-app?error=needs_github_signin`);
-  }
-
-  redirect(`${DASHBOARD_BASE_PATH}/github-app?error=${fallback}`);
+  redirect(`${DASHBOARD_BASE_PATH}/github-app?${params.toString()}`);
 }
 
 export async function linkGitHubInstallation() {
@@ -59,9 +57,7 @@ export async function linkGitHubInstallationById(formData: FormData) {
   try {
     await saveInstallationFromGitHub(session.user.id, parsedId);
   } catch (error) {
-    if (process.env.NODE_ENV === "development") {
-      console.error("[github/link-by-id] failed:", error);
-    }
+    console.error("[github/link-by-id] failed:", error);
     redirectWithGitHubError(error, "link_failed");
   }
 

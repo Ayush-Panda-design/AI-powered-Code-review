@@ -1,5 +1,6 @@
 import { GitHubConnectCard } from "@/features/dashboard/components/github-connect-card";
 import {
+  getGitHubLinkDiagnostics,
   getInstallationForUser,
   tryAutoLinkGitHubInstallation,
 } from "@/features/github/server/installation";
@@ -7,12 +8,12 @@ import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
 
 type GitHubAppPageProps = {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; detail?: string }>;
 };
 
 export default async function GitHubAppPage({ searchParams }: GitHubAppPageProps) {
   const session = await requireSession("/dashboard/github-app");
-  const { error } = await searchParams;
+  const { error, detail } = await searchParams;
 
   let installation = await getInstallationForUser(session.user.id);
   if (!installation) {
@@ -25,6 +26,9 @@ export default async function GitHubAppPage({ searchParams }: GitHubAppPageProps
       select: { id: true },
     }),
   );
+
+  const diagnostics =
+    !installation ? await getGitHubLinkDiagnostics(session.user.id) : null;
 
   return (
     <GitHubConnectCard
@@ -39,6 +43,8 @@ export default async function GitHubAppPage({ searchParams }: GitHubAppPageProps
           : null
       }
       error={error ?? null}
+      errorDetail={detail ?? null}
+      diagnostics={diagnostics}
     />
   );
 }
