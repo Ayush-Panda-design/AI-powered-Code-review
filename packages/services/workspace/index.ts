@@ -1,15 +1,36 @@
 import { prisma, withDbRetry } from "@repo/database";
 import { getFreePlanAiCredits, isDevCreditsMode, slugify } from "../constants";
 
-const MAX_WORKSPACE_SLUG_ATTEMPTS = 20;
+/** Retries when manually creating a workspace name that collides with another user. */
+const MANUAL_WORKSPACE_SLUG_RETRIES = 20;
 
 function isWorkspaceSlugConflict(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    (error as { code?: string }).code === "P2002"
-  );
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return false;
+  }
+
+  const prismaError = error as {
+    code?: string;
+    meta?: { target?: string[] | string };
+  };
+
+  if (prismaError.code !== "P2002") {
+    return false;
+  }
+
+  const target = prismaError.meta?.target;
+  if (!target) {
+    return true;
+  }
+
+  const fields = Array.isArray(target) ? target : [target];
+  return fields.includes("slug");
+}
+
+function uniqueWorkspaceSlug(baseName: string, suffix: string) {
+  const base = slugify(baseName) || "workspace";
+  const tail = slugify(suffix) || suffix.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+  return `${base}-${tail}`.slice(0, 48);
 }
 
 export async function listWorkspacesForUser(userId: string) {
@@ -39,7 +60,7 @@ export async function getWorkspaceForUser(workspaceId: string, userId: string) {
 export async function createWorkspace(userId: string, name: string) {
   const baseSlug = slugify(name) || "workspace";
 
-  for (let attempt = 0; attempt < MAX_WORKSPACE_SLUG_ATTEMPTS; attempt += 1) {
+  for (let attempt = 0; attempt < MANUAL_WORKSPACE_SLUG_RETRIES; attempt += 1) {
     const slug = attempt === 0 ? baseSlug : `${baseSlug}-${attempt}`;
 
     try {
@@ -54,13 +75,43 @@ export async function createWorkspace(userId: string, name: string) {
         include: { members: true },
       });
     } catch (error) {
-      if (!isWorkspaceSlugConflict(error) || attempt === MAX_WORKSPACE_SLUG_ATTEMPTS - 1) {
+      if (
+        !isWorkspaceSlugConflict(error) ||
+        attempt === MANUAL_WORKSPACE_SLUG_RETRIES - 1
+      ) {
         throw error;
       }
     }
   }
 
   throw new Error("Could not allocate a unique workspace slug");
+}
+
+async function createDefaultWorkspaceForUser(userId: string, userName: string) {
+  const name = `${userName.split(" ")[0] ?? "My"}'s Workspace`;
+  const slug = uniqueWorkspaceSlug(name, userId);
+
+  try {
+    return await prisma.workspace.create({
+      data: {
+        name,
+        slug,
+        aiCredits: getFreePlanAiCredits(),
+        members: { create: { userId, role: "owner" } },
+        subscription: { create: { plan: "free", status: "active" } },
+      },
+      include: { members: true },
+    });
+  } catch (error) {
+    if (isWorkspaceSlugConflict(error)) {
+      const existing = await listWorkspacesForUser(userId);
+      if (existing.length > 0) {
+        return existing[0]!;
+      }
+    }
+
+    throw error;
+  }
 }
 
 export async function countConnectedRepositories(workspaceId: string) {
@@ -103,10 +154,7 @@ export async function ensureDefaultWorkspace(userId: string, userName: string) {
   }
 
   try {
-    return await createWorkspace(
-      userId,
-      `${userName.split(" ")[0] ?? "My"}'s Workspace`,
-    );
+    return await createDefaultWorkspaceForUser(userId, userName);
   } catch (error) {
     const createdConcurrently = await listWorkspacesForUser(userId);
     if (createdConcurrently.length > 0) {
