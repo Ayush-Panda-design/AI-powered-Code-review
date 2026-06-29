@@ -137,3 +137,48 @@ export async function deleteInstallationForUser(userId: string) {
     where: { userId },
   });
 }
+
+export type GitHubConnectionStatus =
+  | { state: "connected"; accountLogin: string }
+  | { state: "needs_install"; signedInWithGitHub: true }
+  | { state: "needs_github_signin" };
+
+/** Silently link if the user already installed the GitHub App on their signed-in account. */
+export async function tryAutoLinkGitHubInstallation(userId: string) {
+  const existing = await getInstallationForUser(userId);
+  if (existing) {
+    return existing;
+  }
+
+  const githubAccount = await getGitHubOAuthAccount(userId);
+  if (!githubAccount?.accessToken) {
+    return null;
+  }
+
+  try {
+    return await syncInstallationForUser(userId);
+  } catch {
+    return null;
+  }
+}
+
+export async function getGitHubConnectionStatus(
+  userId: string,
+): Promise<GitHubConnectionStatus> {
+  const installation = await getInstallationForUser(userId);
+  if (installation) {
+    return { state: "connected", accountLogin: installation.accountLogin };
+  }
+
+  const githubAccount = await getGitHubOAuthAccount(userId);
+  if (!githubAccount) {
+    return { state: "needs_github_signin" };
+  }
+
+  const linked = await tryAutoLinkGitHubInstallation(userId);
+  if (linked) {
+    return { state: "connected", accountLogin: linked.accountLogin };
+  }
+
+  return { state: "needs_install", signedInWithGitHub: true };
+}

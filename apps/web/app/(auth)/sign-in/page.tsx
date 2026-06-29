@@ -30,7 +30,8 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
       <CardHeader className="text-center">
         <CardTitle>Sign in</CardTitle>
         <CardDescription>
-          Continue with GitHub or your email and password.
+          Sign in with GitHub for full access (repos, PRs, AI reviews), or use
+          email for the dashboard only.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">

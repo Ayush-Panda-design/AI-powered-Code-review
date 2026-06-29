@@ -59,8 +59,9 @@ export function GitHubConnectCard({
               GitHub App
             </CardTitle>
             <CardDescription>
-              Install the app on your GitHub account or organization to grant
-              repository access for code reviews.
+              Install the app on the <strong>same GitHub account</strong> you
+              used to sign in. ShipFlow will only access repositories you
+              select on GitHub — never another user&apos;s repos.
             </CardDescription>
           </div>
           <Badge
