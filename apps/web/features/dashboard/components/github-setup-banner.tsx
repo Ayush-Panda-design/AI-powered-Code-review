@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Github } from "lucide-react";
+import { GitBranch } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
@@ -32,7 +32,7 @@ export function GitHubSetupBanner({ userId, status }: GitHubSetupBannerProps) {
           </p>
         </div>
         <Link href="/sign-in" className={buttonVariants({ variant: "outline", size: "sm" })}>
-          <Github className="size-4" />
+          <GitBranch className="size-4" />
           Sign in with GitHub
         </Link>
       </div>
@@ -53,7 +53,7 @@ export function GitHubSetupBanner({ userId, status }: GitHubSetupBannerProps) {
       </div>
       {installUrl ? (
         <a href={installUrl} className={buttonVariants({ size: "sm" })}>
-          <Github className="size-4" />
+          <GitBranch className="size-4" />
           Allow repo access
         </a>
       ) : (
