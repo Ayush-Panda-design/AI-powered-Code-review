@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ReviewCommentBody } from "@/features/reviews/components/review-comment-body";
-import { isStoredReviewComment } from "@repo/services";
+import { isStoredReviewComment } from "@repo/services/review/comment-utils";
 import { cn } from "@/lib/utils";
 
 export type PullRequestReviewDialogProps = {
