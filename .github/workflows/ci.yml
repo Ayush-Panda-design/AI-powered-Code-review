@@ -9,6 +9,10 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    env:
+      # Required during `pnpm install` — @repo/database postinstall runs prisma generate
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
     steps:
       - uses: actions/checkout@v4
 
@@ -25,9 +29,6 @@ jobs:
 
       - name: Generate Prisma client
         run: pnpm db:generate
-        env:
-          DATABASE_URL: postgresql://ci:ci@localhost:5432/ci
-          DIRECT_URL: postgresql://ci:ci@localhost:5432/ci
 
       - name: Run tests
         run: pnpm test
