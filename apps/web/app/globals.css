@@ -465,17 +465,18 @@
   }
 }
 
-/* Landing page — warm palette (amber / emerald / stone), no purple/cyan */
+/* Landing page — terminal / GPU-manager aesthetic (pure black) */
 .landing-page {
-  --landing-bg: #fffaf3;
-  --landing-fg: #1c1410;
-  --landing-card: #ffffff;
-  --landing-muted: #fef3e2;
+  --landing-bg: #000000;
+  --landing-fg: #ffffff;
+  --landing-card: #000000;
+  --landing-muted: #050505;
 }
 
-.dark .landing-page {
-  --landing-bg: #120e0a;
-  --landing-fg: #f5ebe0;
-  --landing-card: #1a1410;
-  --landing-muted: #1f1812;
+.landing-terminal {
+  color-scheme: dark;
+}
+
+.landing-terminal .landing-marquee-fade {
+  --landing-bg: #000000;
 }

@@ -2,19 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import {
-  ArrowRight,
-  Check,
-  MessageSquareQuote,
-  Package,
-  Shield,
-  Users,
-} from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
+import { ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
 
-import { ShipFlowLogo } from "@/components/brand/shipflow-logo";
-import { Button } from "@/components/ui/button";
-import { ModeToggle } from "@/components/ui/mode-toggle";
 import {
   Accordion,
   AccordionContent,
@@ -23,28 +13,18 @@ import {
 } from "@/components/ui/accordion";
 import { DEFAULT_POST_AUTH_PATH } from "@/lib/auth-proxy";
 import { cn } from "@/lib/utils";
+import { AsciiCloud } from "@/features/landing/components/ascii-cloud";
+import { FadeUp, Marquee, StaggerChildren, StaggerItem } from "@/features/landing/components/motion";
 import {
-  DrawLine,
-  FadeUp,
-  Floating,
-  Marquee,
-  MovingBorder,
-  PulseRing,
-  Spotlight,
-  StaggerChildren,
-  StaggerItem,
-  TextReveal,
-} from "@/features/landing/components/motion";
-import { DemoSlot } from "@/features/landing/components/demo-slot";
-import {
-  IlluApproval,
-  IlluClarify,
-  IlluRequirements,
-  IlluReview,
-  IlluShip,
-  IlluTasks,
-  IlluUnclearRequest,
-} from "@/features/landing/illustrations";
+  Bracket,
+  CornerMarks,
+  PixelHeading,
+  SectionLabel,
+  TerminalFrame,
+  TerminalGrid,
+  TerminalLink,
+  WorkflowBars,
+} from "@/features/landing/components/terminal-ui";
 
 type LandingPageProps = {
   isSignedIn: boolean;
@@ -76,26 +56,18 @@ const PROBLEMS = [
   {
     title: "Vague ideas become vague builds",
     body: "Teams lose weeks when a customer ask never turns into a clear, shared plan everyone can follow.",
-    Illustration: IlluUnclearRequest,
-    accent: "from-rose-500/20 to-transparent",
   },
   {
     title: "Reviews pile up while work waits",
     body: "Finished code sits in limbo. Context fades. Standups turn into status meetings about who's blocking whom.",
-    Illustration: IlluReview,
-    accent: "from-amber-500/20 to-transparent",
   },
   {
     title: "Scope shifts without a paper trail",
     body: "Mid-sprint surprises, old docs, and hallway decisions — junior folks especially get stuck re-asking the same questions.",
-    Illustration: IlluClarify,
-    accent: "from-orange-500/15 to-transparent",
   },
   {
     title: "Shipping without a final human gate",
     body: "Speed feels great until something slips through. Teams want a deliberate yes before release, not a rushed merge.",
-    Illustration: IlluApproval,
-    accent: "from-emerald-500/15 to-transparent",
   },
 ] as const;
 
@@ -103,37 +75,30 @@ const STEPS = [
   {
     label: "Capture the request",
     detail: "Drop in a customer email, ticket, or idea — one place for what to build next.",
-    Illustration: IlluUnclearRequest,
   },
   {
     label: "Clarify before you commit",
     detail: "AI asks the questions your team would — so scope is understood before anyone writes code.",
-    Illustration: IlluClarify,
   },
   {
     label: "Write requirements together",
     detail: "Turn the idea into a readable plan your team can edit, approve, and refer back to.",
-    Illustration: IlluRequirements,
   },
   {
     label: "Break work into tasks",
     detail: "Engineering tasks appear from the approved plan — ready for your board, not buried in chat.",
-    Illustration: IlluTasks,
   },
   {
     label: "Review against the plan",
     detail: "When a pull request is linked, AI checks it against your requirements — not just style nits.",
-    Illustration: IlluReview,
   },
   {
     label: "Get a human sign-off",
     detail: "A teammate approves the release when findings are resolved — you stay in control.",
-    Illustration: IlluApproval,
   },
   {
     label: "Ship with confidence",
     detail: "Approved features move to shipped — with a trail from request to release.",
-    Illustration: IlluShip,
   },
 ] as const;
 
@@ -160,7 +125,45 @@ const FAQ = [
   },
 ] as const;
 
+const BENTO = [
+  {
+    title: "Shared workspaces",
+    body: "Everyone sees the same feature requests, requirements, and status — no more hunting through threads for what was decided.",
+    span: "md:col-span-2",
+  },
+  {
+    title: "Human release gate",
+    body: "AI assists — people approve. Nothing ships without a deliberate sign-off.",
+    span: "",
+  },
+  {
+    title: "Plan-linked review",
+    body: "Reviews reference your approved requirements — so feedback is about fit, not random opinions.",
+    span: "",
+  },
+  {
+    title: "From tasks to shipped",
+    body: "Track work on a board, link pull requests, fix findings, and mark features shipped when they are actually done.",
+    span: "md:col-span-2",
+  },
+] as const;
+
 const HEADER_SCROLL_THRESHOLD_PX = 24;
+
+function TerminalLogo() {
+  return (
+    <Link href="/" className="inline-flex items-center gap-2">
+      <span className="font-[family-name:var(--font-display-landing)] text-xl uppercase tracking-widest text-white sm:text-2xl">
+        ShipFlow
+      </span>
+      <span className="flex gap-1">
+        <span className="size-2 border border-white/50 bg-white" />
+        <span className="size-2 border border-white/50 bg-transparent" />
+        <span className="size-2 border border-red-500 bg-red-500" />
+      </span>
+    </Link>
+  );
+}
 
 export function LandingPage({ isSignedIn, userName }: LandingPageProps) {
   const [scrolled, setScrolled] = useState(
@@ -183,233 +186,140 @@ export function LandingPage({ isSignedIn, userName }: LandingPageProps) {
     return () => window.clearInterval(timer);
   }, []);
 
+  const primaryHref = isSignedIn ? dashboardHref : signInHref;
+  const primaryLabel = isSignedIn
+    ? userName
+      ? `Welcome, ${userName.split(" ")[0]}`
+      : "Open dashboard"
+    : "Get started";
+
   return (
-    <div className="landing-page min-h-screen bg-[var(--landing-bg)] text-[var(--landing-fg)]">
+    <div className="landing-page landing-terminal min-h-screen bg-black font-[family-name:var(--font-mono-landing)] text-white">
+      <TerminalGrid />
+
       <header
         className={cn(
-          "fixed inset-x-0 top-0 z-50 transition-all duration-300",
-          scrolled
-            ? "border-b border-amber-900/10 bg-[var(--landing-bg)]/85 backdrop-blur-xl dark:border-amber-500/10"
-            : "bg-transparent",
+          "fixed inset-x-0 top-0 z-50 border-b border-transparent transition-colors duration-300",
+          scrolled && "border-white/15 bg-black/90 backdrop-blur-sm",
         )}
       >
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6 sm:py-4">
-          <Link href="/">
-            <ShipFlowLogo size="sm" />
-          </Link>
-          <nav className="hidden items-center gap-8 text-sm font-medium text-stone-600 dark:text-stone-300 md:flex">
-            <a href="#demo" className="transition-colors hover:text-amber-700 dark:hover:text-amber-400">
-              Demo
-            </a>
-            <a href="#problems" className="transition-colors hover:text-amber-700 dark:hover:text-amber-400">
-              Problems
-            </a>
-            <a href="#how-it-works" className="transition-colors hover:text-amber-700 dark:hover:text-amber-400">
-              How it works
-            </a>
-            <a href="#faq" className="transition-colors hover:text-amber-700 dark:hover:text-amber-400">
-              FAQ
-            </a>
+        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
+          <TerminalLogo />
+          <nav className="hidden items-center gap-6 text-[11px] uppercase tracking-[0.2em] text-white/50 md:flex">
+            {[
+              ["#problems", "Problems"],
+              ["#how-it-works", "How it works"],
+              ["#faq", "FAQ"],
+            ].map(([href, label]) => (
+              <a key={href} href={href} className="transition-colors hover:text-white">
+                {label}
+              </a>
+            ))}
           </nav>
-          <div className="flex items-center gap-2">
-            <ModeToggle />
-            {isSignedIn ? (
-              <Button render={<Link href={dashboardHref} />}>Dashboard</Button>
-            ) : (
-              <Button render={<Link href={signInHref} />}>Sign in</Button>
-            )}
-          </div>
+          <TerminalLink href={primaryHref} variant="ghost" className="px-4 py-2 text-[10px] sm:text-xs">
+            {isSignedIn ? "Dashboard" : "Sign in"}
+          </TerminalLink>
         </div>
       </header>
 
-      <main>
+      <main className="relative">
         {/* Hero */}
-        <section className="relative overflow-hidden px-4 pb-10 pt-[4.25rem] sm:px-6 sm:pb-16 sm:pt-28 lg:pb-24 lg:pt-32">
-          <Spotlight className="hidden sm:block" />
-          <motion.div
-            className="pointer-events-none absolute -right-32 top-20 hidden size-72 rounded-full bg-emerald-500/10 blur-3xl sm:block"
-            animate={{ x: [0, -20, 0], y: [0, 15, 0] }}
-            transition={{ duration: 10, repeat: Infinity, ease: "easeInOut" }}
-          />
-          <motion.div
-            className="pointer-events-none absolute -left-20 bottom-10 hidden size-64 rounded-full bg-orange-500/10 blur-3xl sm:block"
-            animate={{ x: [0, 25, 0], y: [0, -10, 0] }}
-            transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
-          />
+        <section className="relative px-4 pb-16 pt-20 sm:px-6 sm:pt-24 lg:pb-24 lg:pt-28">
+          <div className="mx-auto max-w-7xl">
+            <TerminalFrame className="min-h-[min(88vh,920px)]">
+              <CornerMarks />
+              <div className="grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] lg:min-h-[min(88vh,920px)]">
+                {/* Left column */}
+                <div className="flex flex-col justify-between border-b border-white/15 p-5 sm:p-8 lg:border-b-0 lg:border-r lg:p-10">
+                  <div className="space-y-5 sm:space-y-7">
+                    <Bracket>Idea → plan → review → ship</Bracket>
 
-          <div className="relative mx-auto grid max-w-6xl gap-5 sm:gap-8 lg:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)] lg:items-start lg:gap-10">
-            <div className="space-y-3.5 sm:space-y-5 lg:space-y-7">
-              <motion.p
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.5 }}
-                className="inline-flex items-center gap-1.5 rounded-full border border-amber-600/25 bg-amber-500/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-amber-800 sm:gap-2 sm:px-4 sm:py-1.5 sm:text-xs dark:text-amber-300"
-              >
-                <Package className="size-3 sm:size-3.5" />
-                Idea → plan → review → ship
-              </motion.p>
+                    <PixelHeading as="h1" className="max-w-xl text-[2rem] sm:text-5xl lg:text-[3.4rem]">
+                      Stop losing features in the gap between idea and ship
+                      <span className="ml-2 inline-block size-2.5 bg-red-500 align-middle" aria-hidden />
+                    </PixelHeading>
 
-              <h1 className="max-w-xl text-[1.65rem] font-bold leading-[1.1] tracking-tight sm:text-4xl sm:leading-[1.08] lg:text-[3.2rem]">
-                <span className="sm:hidden">
-                  Stop losing features between idea and ship.
-                </span>
-                <span className="hidden sm:inline">
-                  <TextReveal text="Stop losing features in the gap between idea and ship." />
-                </span>
-              </h1>
-
-              <FadeUp delay={0.15}>
-                <p className="max-w-lg text-[0.9375rem] leading-snug text-stone-600 sm:text-lg sm:leading-relaxed dark:text-stone-300">
-                  One calm path from customer request to released feature — clear requirements,
-                  planned tasks, review tied to the plan, and a human yes before anything goes out.
-                </p>
-              </FadeUp>
-
-              {/* Mobile demo — sits high in the fold */}
-              <DemoSlot compact className="md:hidden" />
-
-              <FadeUp delay={0.25} className="flex flex-wrap gap-2 sm:gap-3">
-                {isSignedIn ? (
-                  <Button
-                    size="default"
-                    className="bg-amber-600 text-white hover:bg-amber-700 sm:h-10 sm:px-6"
-                    render={<Link href={dashboardHref} />}
-                  >
-                    {userName ? `Welcome back, ${userName.split(" ")[0]}` : "Open dashboard"}
-                    <ArrowRight className="ml-2 size-4" />
-                  </Button>
-                ) : (
-                  <Button
-                    size="default"
-                    className="bg-amber-600 text-white hover:bg-amber-700 sm:h-10 sm:px-6"
-                    render={<Link href={signInHref} />}
-                  >
-                    Start free
-                    <ArrowRight className="ml-2 size-4" />
-                  </Button>
-                )}
-                <Button
-                  variant="outline"
-                  size="default"
-                  className="border-amber-800/15 bg-transparent sm:h-10 sm:px-6 dark:border-amber-500/20"
-                  render={<a href="#how-it-works" />}
-                >
-                  See how it works
-                </Button>
-              </FadeUp>
-
-              <FadeUp delay={0.32}>
-                <div className="flex flex-col gap-1.5 text-xs text-stone-600 sm:flex-row sm:flex-wrap sm:gap-x-5 sm:gap-y-2 sm:text-sm dark:text-stone-400">
-                  {["No credit card to explore", "Works with GitHub", "Humans approve releases"].map(
-                    (item) => (
-                      <span key={item} className="inline-flex items-center gap-1.5">
-                        <Check className="size-3.5 shrink-0 text-emerald-600 sm:size-4" />
-                        {item}
-                      </span>
-                    ),
-                  )}
-                </div>
-              </FadeUp>
-
-              {/* Compact workflow strip — mobile only */}
-              <div className="flex gap-1.5 overflow-x-auto pb-1 md:hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                {WORKFLOW.map((step, i) => (
-                  <motion.span
-                    key={step}
-                    animate={{
-                      scale: activeStep === i ? 1.04 : 1,
-                      backgroundColor:
-                        activeStep === i
-                          ? "rgba(245, 158, 11, 0.22)"
-                          : "rgba(245, 158, 11, 0.08)",
-                    }}
-                    transition={{ duration: 0.35 }}
-                    className="shrink-0 rounded-full border border-amber-600/20 px-2.5 py-1 text-[11px] font-medium text-amber-900 dark:text-amber-200"
-                  >
-                    {step}
-                  </motion.span>
-                ))}
-              </div>
-            </div>
-
-            <div className="hidden flex-col gap-5 md:flex lg:gap-6">
-              <DemoSlot />
-
-              <FadeUp delay={0.15} className="relative">
-                <MovingBorder>
-                  <div className="p-5 lg:p-6">
-                    <p className="mb-3 text-sm font-medium text-stone-500 dark:text-stone-400">
-                      The delivery loop
+                    <p className="max-w-md text-xs leading-relaxed text-white/55 sm:text-sm">
+                      One calm path from customer request to released feature — clear requirements,
+                      planned tasks, review tied to the plan, and a human yes before anything goes out.
                     </p>
+
+                    <div className="flex flex-wrap gap-3 pt-1">
+                      <Link href={primaryHref} className="inline-flex items-center gap-2 bg-white px-5 py-2.5 text-xs uppercase tracking-[0.18em] text-black transition-colors hover:bg-white/90 sm:text-sm">
+                        {primaryLabel}
+                        <ArrowRight className="size-4" />
+                      </Link>
+                      <TerminalLink href="#how-it-works" variant="ghost">
+                        See how it works
+                      </TerminalLink>
+                    </div>
+
+                    <ul className="space-y-1.5 text-[11px] text-white/45 sm:text-xs">
+                      {["No credit card to explore", "Works with GitHub", "Humans approve releases"].map((item) => (
+                        <li key={item}>
+                          <Bracket>{item}</Bracket>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="mt-10 space-y-4">
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        `Loop: ${WORKFLOW.length} steps`,
+                        `Active: ${WORKFLOW[activeStep]}`,
+                        "Mode: delivery",
+                      ].map((stat) => (
+                        <Bracket key={stat}>{stat}</Bracket>
+                      ))}
+                    </div>
+
                     <div className="flex flex-wrap gap-1.5">
                       {WORKFLOW.map((step, i) => (
                         <motion.span
                           key={step}
-                          animate={{
-                            scale: activeStep === i ? 1.05 : 1,
-                            backgroundColor:
-                              activeStep === i
-                                ? "rgba(245, 158, 11, 0.22)"
-                                : "rgba(245, 158, 11, 0.08)",
-                          }}
-                          transition={{ duration: 0.35 }}
-                          className="rounded-full border border-amber-600/20 px-2.5 py-1 text-xs font-medium text-amber-900 sm:px-3 sm:py-1.5 sm:text-sm dark:text-amber-200"
+                          animate={{ opacity: activeStep === i ? 1 : 0.4 }}
+                          className={cn(
+                            "border px-2 py-0.5 text-[10px] uppercase tracking-wider sm:text-[11px]",
+                            activeStep === i
+                              ? "border-red-500/80 bg-red-500/10 text-white"
+                              : "border-white/15 text-white/45",
+                          )}
                         >
                           {step}
                         </motion.span>
                       ))}
                     </div>
-                    <div className="mt-5 grid h-32 place-items-center sm:h-36">
-                      <Floating duration={6} y={8}>
-                        <AnimatePresence mode="wait">
-                          <motion.div
-                            key={activeStep}
-                            initial={{ opacity: 0, scale: 0.9, rotate: -4 }}
-                            animate={{ opacity: 1, scale: 1, rotate: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, rotate: 4 }}
-                            transition={{ duration: 0.4 }}
-                            className="h-28 w-36 sm:h-32 sm:w-44"
-                          >
-                            {(() => {
-                              const StepIllu = STEPS[Math.min(activeStep, STEPS.length - 1)]!.Illustration;
-                              return <StepIllu />;
-                            })()}
-                          </motion.div>
-                        </AnimatePresence>
-                      </Floating>
-                    </div>
-                    <DrawLine className="mt-3 w-full" />
-                    <p className="mt-3 text-center text-xs text-stone-600 sm:text-sm dark:text-stone-400">
-                      Step {activeStep + 1} of {WORKFLOW.length}:{" "}
-                      <span className="font-medium text-amber-800 dark:text-amber-300">
-                        {STEPS[Math.min(activeStep, STEPS.length - 1)]?.label}
-                      </span>
-                    </p>
+
+                    <WorkflowBars activeIndex={activeStep} />
                   </div>
-                </MovingBorder>
-                <div className="absolute -right-2 -top-2 sm:-right-3 sm:-top-3">
-                  <span className="relative flex size-9 items-center justify-center sm:size-10">
-                    <PulseRing />
-                    <span className="relative flex size-9 items-center justify-center rounded-full bg-emerald-600 text-white shadow-lg sm:size-10">
-                      <Shield className="size-3.5 sm:size-4" />
-                    </span>
-                  </span>
                 </div>
-              </FadeUp>
-            </div>
+
+                {/* Right column — ASCII core */}
+                <div className="relative flex min-h-[280px] flex-col items-center justify-center p-6 sm:min-h-[360px] lg:min-h-0">
+                  <AsciiCloud className="h-full min-h-[240px] w-full max-w-2xl lg:min-h-[420px]" />
+                  <p className="absolute bottom-6 left-6 text-[10px] uppercase tracking-[0.3em] text-white/35">
+                    Processing delivery loop
+                  </p>
+                  <p className="absolute bottom-6 right-6 text-[10px] text-white/35">
+                    step {String(activeStep + 1).padStart(2, "0")} / {WORKFLOW.length}
+                  </p>
+                </div>
+              </div>
+            </TerminalFrame>
           </div>
         </section>
 
-        {/* Pain quotes marquee */}
-        <section className="border-y border-amber-900/8 py-6 dark:border-amber-500/10">
-          <Marquee className="py-1" speed={32}>
-            <div className="flex gap-4">
+        {/* Pain quotes */}
+        <section className="border-y border-white/10 py-5">
+          <Marquee className="py-1" speed={36}>
+            <div className="flex gap-3">
               {PAIN_QUOTES.map((quote) => (
                 <span
                   key={quote}
-                  className="inline-flex shrink-0 items-center gap-2 rounded-full border border-amber-800/10 bg-[var(--landing-card)] px-4 py-2 text-sm text-stone-600 dark:border-amber-500/15 dark:text-stone-300"
+                  className="inline-flex shrink-0 items-center gap-2 border border-white/15 bg-black px-4 py-2 text-[11px] text-white/55 sm:text-xs"
                 >
-                  <MessageSquareQuote className="size-4 shrink-0 text-rose-500" />
+                  <span className="text-red-500">›</span>
                   {quote}
                 </span>
               ))}
@@ -418,49 +328,29 @@ export function LandingPage({ isSignedIn, userName }: LandingPageProps) {
         </section>
 
         {/* Problems */}
-        <section id="problems" className="px-5 py-20 sm:px-6 sm:py-28">
-          <div className="mx-auto max-w-6xl">
-            <FadeUp className="mx-auto max-w-2xl text-center">
-              <p className="text-sm font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400">
-                Sound familiar?
-              </p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+        <section id="problems" className="px-4 py-16 sm:px-6 sm:py-24">
+          <div className="mx-auto max-w-7xl">
+            <FadeUp className="max-w-2xl">
+              <SectionLabel>Sound familiar?</SectionLabel>
+              <PixelHeading className="mt-3 text-3xl sm:text-4xl">
                 The problems teams actually talk about
-              </h2>
-              <p className="mt-4 text-stone-600 dark:text-stone-300">
+              </PixelHeading>
+              <p className="mt-4 text-xs leading-relaxed text-white/50 sm:text-sm">
                 Not invented for a pitch deck — these are the friction points that show up in
                 standups, retros, and late-night threads when delivery slows down.
               </p>
             </FadeUp>
 
-            <StaggerChildren className="mt-14 grid gap-6 sm:grid-cols-2" stagger={0.1}>
-              {PROBLEMS.map((problem) => (
+            <StaggerChildren className="mt-12 grid gap-4 sm:grid-cols-2" stagger={0.08}>
+              {PROBLEMS.map((problem, i) => (
                 <StaggerItem key={problem.title}>
-                  <motion.article
-                    whileHover={{ y: -4 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 22 }}
-                    className={cn(
-                      "group relative overflow-hidden rounded-2xl border border-amber-900/10 bg-[var(--landing-card)] p-6 dark:border-amber-500/10",
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        "pointer-events-none absolute inset-0 bg-gradient-to-br opacity-60",
-                        problem.accent,
-                      )}
-                    />
-                    <div className="relative grid gap-4 sm:grid-cols-[1fr_120px] sm:items-center">
-                      <div>
-                        <h3 className="text-lg font-semibold">{problem.title}</h3>
-                        <p className="mt-2 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
-                          {problem.body}
-                        </p>
-                      </div>
-                      <div className="h-24 sm:h-28">
-                        <problem.Illustration />
-                      </div>
-                    </div>
-                  </motion.article>
+                  <TerminalFrame className="p-5 sm:p-6">
+                    <Bracket>Issue {String(i + 1).padStart(2, "0")}</Bracket>
+                    <h3 className="mt-3 text-sm font-medium uppercase tracking-wide text-white sm:text-base">
+                      {problem.title}
+                    </h3>
+                    <p className="mt-2 text-xs leading-relaxed text-white/50 sm:text-sm">{problem.body}</p>
+                  </TerminalFrame>
                 </StaggerItem>
               ))}
             </StaggerChildren>
@@ -468,34 +358,25 @@ export function LandingPage({ isSignedIn, userName }: LandingPageProps) {
         </section>
 
         {/* How it works */}
-        <section id="how-it-works" className="bg-[var(--landing-muted)] px-5 py-20 sm:px-6 sm:py-28">
-          <div className="mx-auto max-w-6xl">
+        <section id="how-it-works" className="border-t border-white/10 bg-[#050505] px-4 py-16 sm:px-6 sm:py-24">
+          <div className="mx-auto max-w-7xl">
             <FadeUp className="max-w-2xl">
-              <p className="text-sm font-semibold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                How ShipFlow helps
-              </p>
-              <h2 className="mt-3 text-3xl font-bold tracking-tight sm:text-4xl">
+              <SectionLabel>How ShipFlow helps</SectionLabel>
+              <PixelHeading className="mt-3 text-3xl sm:text-4xl">
                 Seven steps. One thread. Nothing falls through.
-              </h2>
+              </PixelHeading>
             </FadeUp>
 
-            <div className="mt-14 space-y-6">
+            <div className="mt-12 space-y-3">
               {STEPS.map((step, i) => (
-                <FadeUp key={step.label} delay={i * 0.04}>
-                  <div className="grid gap-6 rounded-2xl border border-amber-900/8 bg-[var(--landing-card)] p-5 sm:grid-cols-[64px_1fr_140px] sm:items-center dark:border-amber-500/10">
-                    <motion.div
-                      whileInView={{ scale: [0.8, 1] }}
-                      viewport={{ once: true }}
-                      className="flex size-12 items-center justify-center rounded-xl bg-amber-500/15 text-lg font-bold text-amber-800 dark:text-amber-300"
-                    >
-                      {i + 1}
-                    </motion.div>
-                    <div>
-                      <h3 className="font-semibold">{step.label}</h3>
-                      <p className="mt-1 text-sm text-stone-600 dark:text-stone-300">{step.detail}</p>
+                <FadeUp key={step.label} delay={i * 0.03}>
+                  <div className="grid gap-4 border border-white/15 bg-black p-4 sm:grid-cols-[72px_1fr] sm:items-start sm:p-5">
+                    <div className="flex size-12 items-center justify-center border border-white/20 text-lg text-red-400">
+                      {String(i + 1).padStart(2, "0")}
                     </div>
-                    <div className="hidden h-24 sm:block">
-                      <step.Illustration />
+                    <div>
+                      <h3 className="text-sm uppercase tracking-wide text-white">{step.label}</h3>
+                      <p className="mt-1.5 text-xs leading-relaxed text-white/50 sm:text-sm">{step.detail}</p>
                     </div>
                   </div>
                 </FadeUp>
@@ -504,133 +385,70 @@ export function LandingPage({ isSignedIn, userName }: LandingPageProps) {
           </div>
         </section>
 
-        {/* Bento features */}
-        <section className="px-5 py-20 sm:px-6 sm:py-28">
-          <div className="mx-auto max-w-6xl">
-            <FadeUp className="text-center">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+        {/* Bento */}
+        <section className="px-4 py-16 sm:px-6 sm:py-24">
+          <div className="mx-auto max-w-7xl">
+            <FadeUp>
+              <PixelHeading className="text-center text-3xl sm:text-4xl">
                 Built for teams who ship, not slide decks
-              </h2>
+              </PixelHeading>
             </FadeUp>
 
-            <StaggerChildren className="mt-12 grid gap-4 md:grid-cols-3" stagger={0.08}>
-              <StaggerItem className="md:col-span-2">
-                <motion.div
-                  whileHover={{ scale: 1.01 }}
-                  className="h-full rounded-2xl border border-amber-900/10 bg-gradient-to-br from-amber-500/10 to-transparent p-8 dark:border-amber-500/10"
-                >
-                  <Users className="size-8 text-amber-700 dark:text-amber-400" />
-                  <h3 className="mt-4 text-xl font-semibold">Shared workspaces</h3>
-                  <p className="mt-2 max-w-lg text-stone-600 dark:text-stone-300">
-                    Everyone sees the same feature requests, requirements, and status — no more
-                    hunting through threads for what was decided.
-                  </p>
-                  <div className="mt-6 h-32 max-w-md">
-                    <IlluRequirements />
-                  </div>
-                </motion.div>
-              </StaggerItem>
-              <StaggerItem>
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  className="flex h-full flex-col rounded-2xl border border-emerald-800/15 bg-emerald-500/8 p-6 dark:border-emerald-500/20"
-                >
-                  <Shield className="size-7 text-emerald-700 dark:text-emerald-400" />
-                  <h3 className="mt-3 font-semibold">Human release gate</h3>
-                  <p className="mt-2 flex-1 text-sm text-stone-600 dark:text-stone-300">
-                    AI assists — people approve. Nothing ships without a deliberate sign-off.
-                  </p>
-                  <div className="mt-4 h-20">
-                    <IlluApproval />
-                  </div>
-                </motion.div>
-              </StaggerItem>
-              <StaggerItem>
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  className="flex h-full flex-col rounded-2xl border border-amber-900/10 bg-[var(--landing-card)] p-6"
-                >
-                  <h3 className="font-semibold">Plan-linked review</h3>
-                  <p className="mt-2 flex-1 text-sm text-stone-600 dark:text-stone-300">
-                    Reviews reference your approved requirements — so feedback is about fit, not
-                    random opinions.
-                  </p>
-                  <div className="mt-4 h-20">
-                    <IlluReview />
-                  </div>
-                </motion.div>
-              </StaggerItem>
-              <StaggerItem className="md:col-span-2">
-                <motion.div
-                  whileHover={{ scale: 1.01 }}
-                  className="grid gap-6 rounded-2xl border border-amber-900/10 bg-[var(--landing-card)] p-8 sm:grid-cols-2 dark:border-amber-500/10"
-                >
-                  <div>
-                    <h3 className="text-xl font-semibold">From tasks to shipped</h3>
-                    <p className="mt-2 text-stone-600 dark:text-stone-300">
-                      Track work on a board, link pull requests, fix findings, and mark features
-                      shipped when they are actually done.
-                    </p>
-                  </div>
-                  <div className="h-28">
-                    <IlluShip />
-                  </div>
-                </motion.div>
-              </StaggerItem>
+            <StaggerChildren className="mt-12 grid gap-4 md:grid-cols-3" stagger={0.06}>
+              {BENTO.map((item) => (
+                <StaggerItem key={item.title} className={item.span}>
+                  <TerminalFrame className="h-full p-6">
+                    <h3 className="text-sm uppercase tracking-wide text-white">{item.title}</h3>
+                    <p className="mt-2 text-xs leading-relaxed text-white/50 sm:text-sm">{item.body}</p>
+                  </TerminalFrame>
+                </StaggerItem>
+              ))}
             </StaggerChildren>
           </div>
         </section>
 
         {/* CTA */}
-        <section className="px-5 pb-8 sm:px-6">
+        <section className="px-4 pb-8 sm:px-6">
           <FadeUp>
-            <MovingBorder className="mx-auto max-w-4xl">
-              <div className="px-6 py-12 text-center sm:px-12">
-                <h2 className="text-2xl font-bold sm:text-3xl">
-                  Ready to close the gap between idea and ship?
-                </h2>
-                <p className="mx-auto mt-3 max-w-lg text-stone-600 dark:text-stone-300">
-                  Sign in, create a workspace, and walk one real feature through the loop. No
-                  promises we cannot keep — just a clearer path your team can feel.
-                </p>
-                <div className="mt-8 flex flex-wrap justify-center gap-3">
-                  <Button size="lg" className="bg-amber-600 text-white hover:bg-amber-700" render={<Link href={isSignedIn ? dashboardHref : signInHref} />}>
-                    {isSignedIn ? "Go to dashboard" : "Get started"}
-                    <ArrowRight className="ml-2 size-4" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="lg"
-                    render={
-                      <Link
-                        href="https://github.com/Ayush-Panda-design/AI-powered-Code-review"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      />
-                    }
-                  >
-                    View source
-                  </Button>
-                </div>
+            <TerminalFrame className="mx-auto max-w-4xl p-8 text-center sm:p-12">
+              <PixelHeading className="text-2xl sm:text-3xl">
+                Ready to close the gap between idea and ship?
+              </PixelHeading>
+              <p className="mx-auto mt-4 max-w-lg text-xs text-white/50 sm:text-sm">
+                Sign in, create a workspace, and walk one real feature through the loop. No
+                promises we cannot keep — just a clearer path your team can feel.
+              </p>
+              <div className="mt-8 flex flex-wrap justify-center gap-3">
+                <Link href={primaryHref} className="inline-flex items-center gap-2 bg-white px-6 py-3 text-xs uppercase tracking-[0.18em] text-black hover:bg-white/90 sm:text-sm">
+                  {isSignedIn ? "Go to dashboard" : "Get started"}
+                  <ArrowRight className="size-4" />
+                </Link>
+                <TerminalLink
+                  href="https://github.com/Ayush-Panda-design/AI-powered-Code-review"
+                  variant="ghost"
+                  className="px-6 py-3"
+                >
+                  View source
+                </TerminalLink>
               </div>
-            </MovingBorder>
+            </TerminalFrame>
           </FadeUp>
         </section>
 
         {/* FAQ */}
-        <section id="faq" className="px-5 py-20 sm:px-6">
+        <section id="faq" className="px-4 py-16 sm:px-6 sm:pb-24">
           <div className="mx-auto max-w-2xl">
             <FadeUp className="text-center">
-              <h2 className="text-2xl font-bold sm:text-3xl">Questions</h2>
+              <PixelHeading className="text-2xl sm:text-3xl">Questions</PixelHeading>
             </FadeUp>
-            <FadeUp delay={0.1} className="mt-8">
-              <Accordion className="w-full">
+            <FadeUp delay={0.08} className="mt-8">
+              <Accordion className="w-full border-white/20 bg-black text-white [&_[data-slot=accordion-item]]:border-white/15">
                 {FAQ.map((item, i) => (
                   <AccordionItem key={item.q} value={`faq-${i}`}>
-                    <AccordionTrigger className="text-left text-base hover:text-amber-700 dark:hover:text-amber-400">
+                    <AccordionTrigger className="text-left text-xs uppercase tracking-wide hover:text-red-400 sm:text-sm">
                       {item.q}
                     </AccordionTrigger>
-                    <AccordionContent className="text-stone-600 dark:text-stone-300">
+                    <AccordionContent className="text-xs leading-relaxed text-white/50 sm:text-sm">
                       {item.a}
                     </AccordionContent>
                   </AccordionItem>
@@ -641,17 +459,18 @@ export function LandingPage({ isSignedIn, userName }: LandingPageProps) {
         </section>
       </main>
 
-      <footer className="border-t border-amber-900/10 px-5 py-10 dark:border-amber-500/10">
-        <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 sm:flex-row">
-          <ShipFlowLogo size="sm" />
-          <p className="text-sm text-stone-500 dark:text-stone-400">
+      <footer className="border-t border-white/10 px-4 py-8 sm:px-6">
+        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 sm:flex-row">
+          <TerminalLogo />
+          <p className="text-[10px] uppercase tracking-[0.25em] text-white/35">
             ShipFlow AI — ChaiCode Hackathon
           </p>
-          <div className="flex gap-4 text-sm">
-            <Link href="/tech-stack" className="text-stone-600 hover:text-amber-700 dark:text-stone-300 dark:hover:text-amber-400">
-              For judges: tech stack
-            </Link>
-          </div>
+          <Link
+            href="/tech-stack"
+            className="text-[10px] uppercase tracking-[0.2em] text-white/45 transition-colors hover:text-white"
+          >
+            For judges: tech stack
+          </Link>
         </div>
       </footer>
     </div>
