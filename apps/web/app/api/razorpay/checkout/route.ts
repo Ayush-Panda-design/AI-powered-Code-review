@@ -5,6 +5,7 @@ import {
   createProSubscription,
   formatRazorpayClientError,
   getRazorpayConfigError,
+  getRazorpayConfigUserMessage,
 } from "@/lib/razorpay";
 import { getServerSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
@@ -18,7 +19,10 @@ export async function POST(request: Request) {
     const configError = getRazorpayConfigError();
 
     if (configError) {
-      return NextResponse.json({ error: configError }, { status: 503 });
+      return NextResponse.json(
+        { error: getRazorpayConfigUserMessage() },
+        { status: 503 },
+      );
     }
 
     const body = (await request.json()) as { workspaceId?: string };
@@ -65,6 +69,12 @@ export async function POST(request: Request) {
   } catch (error) {
     console.error("[razorpay/checkout]", error);
     const { message, status, diagnostics } = formatRazorpayClientError(error);
-    return NextResponse.json({ error: message, diagnostics }, { status });
+    return NextResponse.json(
+      {
+        error: message,
+        ...(process.env.NODE_ENV === "development" ? { diagnostics } : {}),
+      },
+      { status },
+    );
   }
 }

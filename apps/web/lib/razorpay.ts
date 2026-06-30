@@ -1,18 +1,63 @@
 import { createHmac } from "node:crypto";
+import Razorpay from "razorpay";
+import { validatePaymentVerification } from "razorpay/dist/utils/razorpay-utils";
 
 const PRO_PLAN_AMOUNT_PAISE = 99_900;
 const PRO_PLAN_CURRENCY = "INR";
 const PRO_SUBSCRIPTION_MONTHS = 12;
 
 let cachedPlanId: string | null = null;
+let cachedClient: Razorpay | null = null;
+let cachedClientKey = "";
 
 function readEnv(name: string) {
-  const raw = process.env[name]?.trim();
+  const raw = process.env[name]?.trim().replace(/^\uFEFF/, "");
   if (!raw) {
     return undefined;
   }
 
   return raw.replace(/^["']|["']$/g, "");
+}
+
+function getRazorpayClient() {
+  const key_id = readEnv("RAZORPAY_KEY_ID");
+  const key_secret = readEnv("RAZORPAY_KEY_SECRET");
+  if (!key_id || !key_secret) {
+    throw new Error("Razorpay is not configured");
+  }
+
+  const clientKey = `${key_id}:${key_secret}`;
+  if (!cachedClient || cachedClientKey !== clientKey) {
+    cachedClient = new Razorpay({ key_id, key_secret });
+    cachedClientKey = clientKey;
+  }
+
+  return cachedClient;
+}
+
+function wrapRazorpaySdkError(error: unknown, path: string): never {
+  if (error && typeof error === "object") {
+    const sdkError = error as {
+      statusCode?: number;
+      error?: { description?: string; reason?: string; code?: string };
+      message?: string;
+    };
+
+    const detail =
+      sdkError.error?.description ??
+      sdkError.error?.reason ??
+      sdkError.error?.code ??
+      sdkError.message ??
+      "Unknown Razorpay error";
+
+    throw new RazorpayApiError(
+      `Razorpay API ${path} failed: ${detail}`,
+      sdkError.statusCode ?? 502,
+      path,
+    );
+  }
+
+  throw error;
 }
 
 export class RazorpayApiError extends Error {
@@ -27,28 +72,6 @@ export class RazorpayApiError extends Error {
   }
 }
 
-function parseRazorpayErrorBody(body: string) {
-  try {
-    const parsed = JSON.parse(body) as {
-      error?: { code?: string; description?: string; reason?: string };
-    };
-    const err = parsed.error;
-    if (err?.description) {
-      return err.description;
-    }
-    if (err?.reason) {
-      return err.reason;
-    }
-    if (err?.code) {
-      return err.code;
-    }
-  } catch {
-    // ignore JSON parse errors
-  }
-
-  return body.slice(0, 300);
-}
-
 export function formatRazorpayClientError(error: unknown): {
   message: string;
   status: number;
@@ -58,36 +81,11 @@ export function formatRazorpayClientError(error: unknown): {
     const detail = error.message;
     if (error.statusCode === 401 || /unauthorized/i.test(detail)) {
       const diagnostics = getRazorpayKeyDiagnostics();
-      const hints: string[] = [
-        "Razorpay returned Unauthorized — the Key ID and Key Secret pair is wrong or mismatched.",
-        "Use values from Razorpay → Settings → API Keys (not the webhook secret).",
-        "Key ID and secret must be generated together; regenerating invalidates the old secret.",
-        "After updating Vercel env vars, redeploy Production.",
-      ];
-
-      if (diagnostics.apiSecretMatchesWebhookSecret) {
-        hints.unshift(
-          "RAZORPAY_KEY_SECRET matches RAZORPAY_WEBHOOK_SECRET — use the API key secret instead.",
-        );
-      }
-
-      if (diagnostics.keyIdMode === "live") {
-        hints.push(
-          "You are using live keys (rzp_live_…). Complete Razorpay KYC and use Live Mode API keys, or switch to test keys (rzp_test_…) for testing.",
-        );
-      } else if (diagnostics.keyIdMode === "test") {
-        hints.push(
-          "For testing, Razorpay dashboard must be in Test Mode when you copy rzp_test_… keys.",
-        );
-      } else if (diagnostics.keyIdMode === "invalid") {
-        hints.push(
-          "RAZORPAY_KEY_ID must start with rzp_test_ or rzp_live_.",
-        );
-      }
 
       return {
         status: 401,
-        message: hints.join(" "),
+        message:
+          "We couldn't start checkout right now. Online upgrades are temporarily unavailable — please try again later or contact support.",
         diagnostics,
       };
     }
@@ -96,19 +94,31 @@ export function formatRazorpayClientError(error: unknown): {
       return {
         status: 503,
         message:
-          "Subscriptions are not enabled on your Razorpay account. Enable Subscriptions in the Razorpay dashboard, then try again.",
+          "Monthly billing isn't available yet. Please try again later or contact support.",
       };
     }
 
     return {
-      status: error.statusCode >= 400 && error.statusCode < 600 ? error.statusCode : 502,
-      message: detail,
+      status:
+        error.statusCode >= 400 && error.statusCode < 600 ? error.statusCode : 502,
+      message:
+        "Something went wrong while opening checkout. Please try again in a few minutes.",
     };
   }
 
   const message =
     error instanceof Error ? error.message : "Failed to create checkout";
-  return { message, status: 500 };
+  return {
+    message: /razorpay/i.test(message)
+      ? "Something went wrong while opening checkout. Please try again in a few minutes."
+      : message,
+    status: 500,
+  };
+}
+
+/** Short message for billing UI when keys are missing (server config, not user fault). */
+export function getRazorpayConfigUserMessage(): string {
+  return "Online upgrades aren't available on this site yet. Please contact support if you need Pro.";
 }
 
 export function isRazorpayConfigured() {
@@ -170,45 +180,14 @@ export function getRazorpayProductionConfigError(): string | null {
   return null;
 }
 
-function getAuthHeader() {
-  const keyId = readEnv("RAZORPAY_KEY_ID");
-  const keySecret = readEnv("RAZORPAY_KEY_SECRET");
-  if (!keyId || !keySecret) {
-    throw new Error("Razorpay is not configured");
-  }
-
-  const token = Buffer.from(`${keyId}:${keySecret}`).toString("base64");
-  return `Basic ${token}`;
-}
-
-async function razorpayFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`https://api.razorpay.com/v1${path}`, {
-    ...init,
-    headers: {
-      Authorization: getAuthHeader(),
-      "Content-Type": "application/json",
-      ...init?.headers,
-    },
-  });
-
-  if (!response.ok) {
-    const errorBody = await response.text();
-    const detail = parseRazorpayErrorBody(errorBody);
-    throw new RazorpayApiError(
-      `Razorpay API ${path} failed: ${detail}`,
-      response.status,
-      path,
-      errorBody,
-    );
-  }
-
-  return response.json() as Promise<T>;
-}
-
 /** Read-only ping — verifies Key ID + Key Secret without creating billing resources. */
 export async function verifyRazorpayCredentials() {
-  await razorpayFetch<{ count?: number }>("/plans?count=1");
-  return { ok: true as const };
+  try {
+    await getRazorpayClient().plans.all({ count: 1 });
+    return { ok: true as const };
+  } catch (error) {
+    wrapRazorpaySdkError(error, "/plans");
+  }
 }
 
 /** Returns dashboard plan id or creates a monthly Pro plan once per process. */
@@ -222,9 +201,8 @@ export async function getOrCreateProPlanId() {
     return cachedPlanId;
   }
 
-  const plan = await razorpayFetch<{ id: string }>("/plans", {
-    method: "POST",
-    body: JSON.stringify({
+  try {
+    const plan = await getRazorpayClient().plans.create({
       period: "monthly",
       interval: 1,
       item: {
@@ -233,11 +211,13 @@ export async function getOrCreateProPlanId() {
         currency: PRO_PLAN_CURRENCY,
         description: "Monthly Pro subscription — 200 AI credits, 100 repos",
       },
-    }),
-  });
+    });
 
-  cachedPlanId = plan.id;
-  return plan.id;
+    cachedPlanId = plan.id;
+    return plan.id;
+  } catch (error) {
+    wrapRazorpaySdkError(error, "/plans");
+  }
 }
 
 /** Creates a Razorpay subscription for monthly Pro billing. */
@@ -248,13 +228,9 @@ export async function createProSubscription(workspaceId: string) {
   }
 
   const planId = await getOrCreateProPlanId();
-  const subscription = await razorpayFetch<{
-    id: string;
-    status: string;
-    plan_id: string;
-  }>("/subscriptions", {
-    method: "POST",
-    body: JSON.stringify({
+
+  try {
+    const subscription = await getRazorpayClient().subscriptions.create({
       plan_id: planId,
       total_count: PRO_SUBSCRIPTION_MONTHS,
       quantity: 1,
@@ -263,16 +239,18 @@ export async function createProSubscription(workspaceId: string) {
         workspaceId,
         plan: "pro",
       },
-    }),
-  });
+    });
 
-  return {
-    keyId,
-    subscriptionId: subscription.id,
-    planId: subscription.plan_id,
-    amount: PRO_PLAN_AMOUNT_PAISE,
-    currency: PRO_PLAN_CURRENCY,
-  };
+    return {
+      keyId,
+      subscriptionId: subscription.id,
+      planId: subscription.plan_id,
+      amount: PRO_PLAN_AMOUNT_PAISE,
+      currency: PRO_PLAN_CURRENCY,
+    };
+  } catch (error) {
+    wrapRazorpaySdkError(error, "/subscriptions");
+  }
 }
 
 export function verifyRazorpayPaymentSignature(
@@ -292,6 +270,7 @@ export function verifyRazorpayPaymentSignature(
   return expected === signature;
 }
 
+/** Docs + official SDK: hmac_sha256(payment_id + "|" + subscription_id, secret) */
 export function verifyRazorpaySubscriptionSignature(
   subscriptionId: string,
   paymentId: string,
@@ -302,11 +281,15 @@ export function verifyRazorpaySubscriptionSignature(
     return false;
   }
 
-  const expected = createHmac("sha256", secret)
-    .update(`${paymentId}|${subscriptionId}`)
-    .digest("hex");
-
-  return expected === signature;
+  try {
+    return validatePaymentVerification(
+      { payment_id: paymentId, subscription_id: subscriptionId },
+      signature,
+      secret,
+    );
+  } catch {
+    return false;
+  }
 }
 
 export function verifyRazorpayWebhookSignature(body: string, signature: string) {
