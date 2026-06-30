@@ -4,7 +4,6 @@
 
 **From customer idea to shipped code — one calm thread your whole team can follow.**
 
-ShipFlow AI is an AI-assisted product delivery platform built for the ChaiCode hackathon. It connects planning, GitHub pull requests, and human approval into a single workflow so features do not get lost between “someone asked for this” and “it is live.”
 
 | | |
 |---|---|
