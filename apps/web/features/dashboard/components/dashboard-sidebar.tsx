@@ -18,7 +18,7 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar";
 import { AutoHideScroll } from "@/components/ui/auto-hide-scroll";
-import { dashboardRoutes } from "@/features/dashboard/lib/routes";
+import { dashboardRoutes, helpRoute } from "@/features/dashboard/lib/routes";
 import { WorkspaceSwitcher } from "@/features/dashboard/components/workspace-switcher";
 
 type DashboardSidebarProps = {
@@ -82,6 +82,28 @@ export function DashboardSidebar({
                     </SidebarMenuItem>
                   );
                 })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+
+          <SidebarGroup>
+            <SidebarGroupLabel>Help</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    isActive={
+                      pathname === helpRoute.href ||
+                      pathname.startsWith(`${helpRoute.href}/`)
+                    }
+                    tooltip={helpRoute.title}
+                    render={<Link href={helpRoute.href} />}
+                    className="bg-primary/5 font-medium text-primary hover:bg-primary/10 hover:text-primary data-[active=true]:bg-primary/10 data-[active=true]:text-primary"
+                  >
+                    <helpRoute.icon />
+                    <span>{helpRoute.title}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>

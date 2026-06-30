@@ -211,7 +211,9 @@ export async function syncAllRepositories(input: {
           if (input.syncRunId) {
             void touchSyncRun(input.syncRunId, {
               completedRepos: { increment: 1 },
-            }).catch(() => {});
+            }).catch((error) => {
+              console.error("[github/sync] touchSyncRun failed:", error);
+            });
           }
         }
       }),
@@ -254,29 +256,28 @@ export function buildSyncFailureMessage(input: {
     return null;
   }
 
-  if (input.failedRepos < input.totalRepos) {
+  const formatPreview = (limit: number) => {
     const preview = input.repoFailures
-      .slice(0, 2)
+      .slice(0, limit)
       .map((f) => `${f.repoFullName} (${f.message})`)
       .join("; ");
     const suffix =
-      input.repoFailures.length > 2
-        ? ` (+${input.repoFailures.length - 2} more)`
+      input.repoFailures.length > limit
+        ? ` (+${input.repoFailures.length - limit} more)`
         : "";
-    return `GitHub sync failed for ${input.failedRepos} of ${input.totalRepos} repos: ${preview}${suffix}`;
+    return preview ? `${preview}${suffix}` : null;
+  };
+
+  if (input.failedRepos < input.totalRepos) {
+    const detail =
+      formatPreview(2) ??
+      `${input.failedRepos} repo${input.failedRepos === 1 ? "" : "s"} could not be reached`;
+    return `GitHub sync failed for ${input.failedRepos} of ${input.totalRepos} repos: ${detail}`;
   }
 
-  const preview = input.repoFailures
-    .slice(0, 3)
-    .map((f) => `${f.repoFullName} (${f.message})`)
-    .join("; ");
-  const suffix =
-    input.repoFailures.length > 3
-      ? ` (+${input.repoFailures.length - 3} more)`
-      : "";
-
-  if (preview) {
-    return `GitHub sync failed for every connected repo: ${preview}${suffix}`;
+  const detail = formatPreview(3);
+  if (detail) {
+    return `GitHub sync failed for every connected repo: ${detail}`;
   }
 
   return "GitHub sync failed for every connected repository. Reconnect the GitHub App, then disconnect and reconnect each repo on the Repositories page.";

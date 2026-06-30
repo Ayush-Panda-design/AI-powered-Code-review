@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Activity,
   BarChart3,
+  CircleHelp,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -120,8 +121,16 @@ export const dashboardRoutes: DashboardRoute[] = [
   },
 ];
 
+export const helpRoute: DashboardRoute = {
+  title: "Help & Guide",
+  href: `${DASHBOARD_BASE_PATH}/help`,
+  icon: CircleHelp,
+  description: "Learn how to use ShipFlow AI from start to finish",
+};
+
 export function getDashboardRoute(pathname: string) {
-  return dashboardRoutes.find(
+  const allRoutes = [...dashboardRoutes, helpRoute];
+  return allRoutes.find(
     (route) =>
       route.href === pathname ||
       (route.href !== DASHBOARD_BASE_PATH && pathname.startsWith(`${route.href}/`)),
