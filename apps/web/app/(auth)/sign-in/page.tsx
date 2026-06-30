@@ -51,9 +51,9 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
           >
             <p>{oauthError}</p>
             <p className="text-xs text-destructive/80">
-              Using a different GitHub account? Sign out at github.com first, or
-              use a private/incognito window so GitHub does not reuse your other
-              login.
+              Switching GitHub accounts? Open github.com → profile → Sign out, then
+              try again. Or use a private/incognito window so GitHub does not reuse
+              your previous login.
             </p>
           </div>
         ) : null}

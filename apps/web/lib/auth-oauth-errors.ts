@@ -14,7 +14,7 @@ const OAUTH_ERROR_MESSAGES: Record<string, string> = {
   account_already_linked_to_different_user:
     "This GitHub account is already linked to another ShipFlow user. Sign in with that account or use a different GitHub account.",
   account_not_linked:
-    "This GitHub email matches an existing ShipFlow account that was created with email/password. Sign in with email first, or use the same GitHub account you used before.",
+    "This GitHub login could not be connected to your existing ShipFlow account. Sign in with email/password first, then connect GitHub from the dashboard — or use a private window with a different GitHub account.",
   unable_to_link_account:
     "Could not link this GitHub account to your ShipFlow user. Try signing in again.",
   unable_to_create_user:
