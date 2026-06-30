@@ -34,6 +34,10 @@ import {
   getLowCreditsBannerMessage,
 } from "@/features/shipflow/lib/credit-hints";
 import { BILLING_PATH } from "@/features/dashboard/lib/routes";
+import {
+  formatAiActionLabel,
+  formatFeatureSource,
+} from "@/features/dashboard/lib/user-facing-labels";
 import { approvePlanAction, approvePrdAction } from "@/lib/actions/shipflow";
 import { AI_CREDIT_COSTS, isInFlightFeatureStatus } from "@repo/services/constants";
 import { trpc } from "@/trpc/client";
@@ -134,7 +138,7 @@ export function FeatureRequestDetailClient({
     aiMutationHandlers("AI clarify", AI_CREDIT_COSTS.clarify),
   );
   const prdMutation = trpc.shipflow.triggerPrd.useMutation(
-    aiMutationHandlers("Generate PRD", AI_CREDIT_COSTS.prd),
+    aiMutationHandlers("Write requirements", AI_CREDIT_COSTS.prd),
   );
 
   const tasksMutation = trpc.shipflow.triggerTasks.useMutation(
@@ -146,7 +150,7 @@ export function FeatureRequestDetailClient({
 
   const approvePrdMutation = trpc.shipflow.approvePrd.useMutation({
     onSuccess: async () => {
-      toast.success("PRD approved — you can now generate tasks");
+      toast.success("Requirements approved — you can now generate tasks");
       await invalidate();
     },
     onError: (err) => toast.error(err.message),
@@ -184,7 +188,7 @@ export function FeatureRequestDetailClient({
   );
 
   const creditAffordance = (cost: number) =>
-    getCreditAffordance({ cost, credits, inFlight, billingHref });
+    getCreditAffordance({ cost, credits, inFlight });
 
   const lowCreditsBanner = getLowCreditsBannerMessage(
     credits,
@@ -195,7 +199,7 @@ export function FeatureRequestDetailClient({
     return (
       <LoadingState
         label="Loading feature"
-        description="Fetching PRD, tasks, and workflow status."
+        description="Fetching requirements, tasks, and workflow status."
         variant="features"
         size="lg"
       />
@@ -227,7 +231,7 @@ export function FeatureRequestDetailClient({
           <div className="mt-2 flex flex-wrap items-center gap-2">
             <FeatureStatusBadge status={feature.status} />
             <span className="text-xs text-muted-foreground">
-              Source: {feature.source}
+              {formatFeatureSource(feature.source)}
             </span>
             {workspace ? (
               <span className="text-xs text-muted-foreground">
@@ -248,7 +252,7 @@ export function FeatureRequestDetailClient({
               clarifyMutation.mutate({ featureRequestId: featureId });
             }}
           >
-            {clarifyMutation.isPending ? <ButtonLoadingLabel>Starting…</ButtonLoadingLabel> : `AI clarify (${AI_CREDIT_COSTS.clarify} cr)`}
+            {clarifyMutation.isPending ? <ButtonLoadingLabel>Starting…</ButtonLoadingLabel> : formatAiActionLabel("Clarify with AI", AI_CREDIT_COSTS.clarify)}
           </Button>
           <Button
             variant="outline"
@@ -261,13 +265,13 @@ export function FeatureRequestDetailClient({
               prdMutation.mutate({ featureRequestId: featureId });
             }}
           >
-            {prdMutation.isPending ? <ButtonLoadingLabel>Starting…</ButtonLoadingLabel> : `Generate PRD (${AI_CREDIT_COSTS.prd} cr)`}
+            {prdMutation.isPending ? <ButtonLoadingLabel>Starting…</ButtonLoadingLabel> : formatAiActionLabel("Write requirements", AI_CREDIT_COSTS.prd)}
           </Button>
           <Button
             variant="outline"
             size="sm"
             disabled={isGeneratingTasks || (!canGenerateTasks && feature.status !== "planning")}
-            title={canGenerateTasks || feature.status === "planning" ? creditAffordance(AI_CREDIT_COSTS.tasks).hint : "Approve the PRD before generating tasks"}
+            title={canGenerateTasks || feature.status === "planning" ? creditAffordance(AI_CREDIT_COSTS.tasks).hint : "Approve the requirements doc before generating tasks"}
             onClick={() => {
               const { canAfford, hint } = creditAffordance(AI_CREDIT_COSTS.tasks);
               if (!canAfford) { toast.error(hint); return; }
@@ -278,7 +282,7 @@ export function FeatureRequestDetailClient({
               ? <ButtonLoadingLabel>Generating…</ButtonLoadingLabel>
               : feature.status === "planning"
                 ? "Retry generate tasks"
-                : `Generate tasks (${AI_CREDIT_COSTS.tasks} cr)`}
+                : formatAiActionLabel("Generate tasks", AI_CREDIT_COSTS.tasks)}
           </Button>
           {hasTasks && (
             <Link href={tasksUrl}>
@@ -380,25 +384,25 @@ export function FeatureRequestDetailClient({
 
       {/* ── Approve PRD ─────────────────────────────────────────────── */}
       {feature.status === "awaiting_prd_approval" && feature.prd && (
-        <CollapsibleCard title="Approve PRD" defaultOpen accent="amber"
+        <CollapsibleCard title="Approve requirements" defaultOpen accent="amber"
           statusPill={<span className="rounded-full bg-amber-500/10 px-2 py-0.5 text-[11px] text-amber-600">Action needed</span>}>
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Review the PRD below. Approve it to unlock task generation.
+              Review the requirements below. Approve them to unlock task generation.
             </p>
             <Button size="sm" disabled={isApprovingPrd || approvePrdMutation.isPending}
               onClick={() => {
                 startPrdApproval(async () => {
                   try {
                     await approvePrdAction(featureId);
-                    toast.success("PRD approved — now generate tasks");
+                    toast.success("Requirements approved — now generate tasks");
                     await invalidate();
                   } catch (error) {
-                    toast.error(error instanceof Error ? error.message : "Failed to approve PRD");
+                    toast.error(error instanceof Error ? error.message : "Failed to approve requirements");
                   }
                 });
               }}>
-              {isApprovingPrd || approvePrdMutation.isPending ? <ButtonLoadingLabel>Approving…</ButtonLoadingLabel> : "Approve PRD"}
+              {isApprovingPrd || approvePrdMutation.isPending ? <ButtonLoadingLabel>Approving…</ButtonLoadingLabel> : "Approve requirements"}
             </Button>
           </div>
         </CollapsibleCard>
@@ -444,7 +448,7 @@ export function FeatureRequestDetailClient({
       {/* ── PRD ──────────────────────────────────────────────────────── */}
       {feature.prd && (
         <CollapsibleCard
-          title="PRD"
+          title="Requirements doc"
           defaultOpen={feature.status === "awaiting_prd_approval" || feature.status === "prd_ready"}
           accent={feature.prd.status === "approved" ? "green" : "amber"}
           statusPill={
@@ -460,7 +464,7 @@ export function FeatureRequestDetailClient({
                 {feature.clarifications.length > 0 ? `Informed by ${feature.clarifications.length} clarification message(s).` : "Generated from request description."}
               </p>
               <Link href={`/dashboard/prd/${featureId}`} className="text-xs text-muted-foreground hover:underline">
-                Open in PRD Editor →
+                Open in requirements editor →
               </Link>
             </div>
             <PrdDiffPanel aiDraftMarkdown={feature.prd.aiDraftMarkdown} currentMarkdown={feature.prd.rawMarkdown} />
@@ -484,7 +488,7 @@ export function FeatureRequestDetailClient({
         >
           <div className="space-y-2">
             <p className="text-xs text-muted-foreground">
-              These tasks were generated from the approved PRD. Use the Task Board to move them forward, generate code with AI, or manage them.
+              These tasks were generated from the approved requirements. Use the Task Board to move them forward, draft code with AI, or manage them.
             </p>
             <div className="space-y-1.5">
               {feature.tasks.map((task) => (
@@ -531,7 +535,7 @@ export function FeatureRequestDetailClient({
         <div className="rounded-xl border border-violet-500/30 bg-violet-500/[0.05] p-4">
           <div className="flex items-center gap-2">
             <span className="inline-block size-2 animate-pulse rounded-full bg-violet-500" />
-            <p className="text-sm font-medium text-violet-700">Breaking PRD into engineering tasks…</p>
+            <p className="text-sm font-medium text-violet-700">Turning requirements into engineering tasks…</p>
           </div>
           <TaskGenerationProgress className="mt-3" />
         </div>
@@ -541,13 +545,13 @@ export function FeatureRequestDetailClient({
       {!hasTasks && feature.status !== "planning" && feature.prd?.status === "approved" && (
         <div className="rounded-xl border border-dashed border-violet-500/40 bg-violet-500/[0.03] p-4 text-sm text-muted-foreground">
           <p className="font-medium text-foreground">Next: Generate engineering tasks</p>
-          <p className="mt-1 text-xs">The PRD is approved. Click <strong>Generate tasks ({AI_CREDIT_COSTS.tasks} cr)</strong> above to break it into actionable engineering tasks on the Task Board.</p>
+          <p className="mt-1 text-xs">Requirements are approved. Click <strong>{formatAiActionLabel("Generate tasks", AI_CREDIT_COSTS.tasks)}</strong> above to break them into actionable tasks on the Task Board.</p>
         </div>
       )}
       {!feature.prd && feature.status !== "prd_generating" && (
         <div className="rounded-xl border border-dashed p-4 text-sm text-muted-foreground">
-          <p className="font-medium text-foreground">Next: Generate a PRD</p>
-          <p className="mt-1 text-xs">Click <strong>Generate PRD</strong> above to create a structured Product Requirements Document from this request{feature.clarifications.length > 0 ? " and the clarifications" : ""}.</p>
+          <p className="font-medium text-foreground">Next: Write requirements</p>
+          <p className="mt-1 text-xs">Click <strong>Write requirements</strong> above to turn this request{feature.clarifications.length > 0 ? " and the clarifications" : ""} into a structured product plan.</p>
         </div>
       )}
 

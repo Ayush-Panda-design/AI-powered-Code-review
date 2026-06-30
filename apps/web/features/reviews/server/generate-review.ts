@@ -119,7 +119,7 @@ function formatPrdContext(context: ReviewContext) {
   }
 
   if (!context.prd) {
-    return "No PRD is linked to this pull request.";
+    return "No requirements are linked to this pull request.";
   }
 
   const sections = [
@@ -213,8 +213,8 @@ async function generateReviewTextFallback(
   return normalizeReview({
     summary: text.trim() || "Review completed with summary-only fallback.",
     prdAlignment: isPrdAware
-      ? "Automated fallback review — re-run for structured PRD alignment."
-      : "No PRD linked.",
+      ? "Automated fallback review — re-run for structured requirements alignment."
+      : "No requirements linked.",
     findings: [],
     confidenceScore: 70,
   });

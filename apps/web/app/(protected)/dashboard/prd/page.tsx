@@ -19,9 +19,9 @@ export default async function PrdListPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">PRD Editor</h1>
+        <h1 className="text-2xl font-semibold">Requirements</h1>
         <p className="text-sm text-muted-foreground">
-          View and edit product requirement documents generated from feature requests
+          View and edit product requirements generated from feature requests
         </p>
       </div>
 
@@ -29,7 +29,7 @@ export default async function PrdListPage() {
 
       {prds.length === 0 ? (
         <p className="text-sm text-muted-foreground">
-          No PRDs yet. Create a feature request and run Generate PRD.
+          No requirements yet. Create a feature request and run Write requirements.
         </p>
       ) : (
         <div className="grid gap-3">

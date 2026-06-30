@@ -25,6 +25,7 @@ import {
 import { ProjectPicker } from "@/features/dashboard/components/project-picker";
 import { SectionGuideCard } from "@/features/dashboard/components/section-guide-card";
 import { FEATURE_STATUS_LABELS } from "@/features/dashboard/lib/routes";
+import { formatFeatureSource } from "@/features/dashboard/lib/user-facing-labels";
 import { FeatureStatusBadge } from "@/features/shipflow/components/feature-status-badge";
 import { LoadingState } from "@/components/ui/loading-state";
 import { trpc } from "@/trpc/client";
@@ -32,14 +33,16 @@ import { trpc } from "@/trpc/client";
 type FeatureRequestsPageClientProps = {
   projectId: string;
   projects: Array<{ id: string; name: string }>;
+  initialStatusFilter?: string;
 };
 
 export function FeatureRequestsPageClient({
   projectId,
   projects,
+  initialStatusFilter = "all",
 }: FeatureRequestsPageClientProps) {
   const [search, setSearch] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState(initialStatusFilter);
   const [resume, setResume] = useState<LastFeature | null>(null);
 
   useEffect(() => {
@@ -173,7 +176,7 @@ export function FeatureRequestsPageClient({
               required
             />
             <label className="grid gap-1 text-sm">
-              <span className="text-muted-foreground">Intake source</span>
+              <span className="text-muted-foreground">How it arrived</span>
               <select
                 name="source"
                 className="rounded-md border bg-background px-3 py-2 text-sm"
@@ -255,7 +258,8 @@ export function FeatureRequestsPageClient({
                   <div className="flex shrink-0 items-center gap-3 text-xs text-muted-foreground">
                     <FeatureStatusBadge status={feature.status} />
                     <span>{feature._count.tasks} tasks</span>
-                    {feature.prd && <span>PRD</span>}
+                    {feature.prd && <span>Requirements doc</span>}
+                    <span>{formatFeatureSource(feature.source)}</span>
                   </div>
                 </CardContent>
               </Card>

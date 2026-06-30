@@ -1,5 +1,6 @@
 import { serve } from "inngest/next";
 
+import { checkExpiredSubscriptions } from "@/features/billing/server/subscription-expiry-cron";
 import { inngest } from "@/features/inngest/client";
 import { reviewPullRequest } from "@/features/reviews/server/review-pr-function";
 import { checkStalePullRequests } from "@/features/reviews/server/stale-pr-cron";
@@ -24,5 +25,6 @@ export const { GET, POST, PUT } = serve({
     openTaskDraftPr,
     checkStalePullRequests,
     syncGitHubPullRequests,
+    checkExpiredSubscriptions,
   ],
 });

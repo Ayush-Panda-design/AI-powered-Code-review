@@ -28,8 +28,7 @@ export default async function PullRequestsPage() {
         <CardHeader>
           <CardTitle>Pull Requests</CardTitle>
           <CardDescription>
-            Connect the GitHub App to receive pull request webhooks and track
-            reviews here.
+            Connect GitHub to sync pull requests and run AI reviews here.
           </CardDescription>
         </CardHeader>
         <CardContent>

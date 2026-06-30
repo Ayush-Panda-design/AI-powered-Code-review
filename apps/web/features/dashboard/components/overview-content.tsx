@@ -45,7 +45,7 @@ export function OverviewContent({
     {
       title: "Reviews this week",
       value: String(data.reviewsThisWeek),
-      change: `${data.prdCount} PRDs · ${data.featureRequestCount} features`,
+      change: `${data.prdCount} requirement docs · ${data.featureRequestCount} features`,
     },
     {
       title: "Awaiting release",

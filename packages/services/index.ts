@@ -10,6 +10,8 @@ export * from "./prd";
 export * from "./plan-approval";
 export * from "./task";
 export * from "./repository";
+export * from "./repository/installation-sync";
+export * from "./billing/subscription-expiry";
 export * from "./pull-request";
 export * from "./activity";
 export * from "./review-rules";

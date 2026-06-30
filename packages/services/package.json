@@ -9,12 +9,16 @@
     "./sync-errors": "./sync-errors.ts",
     "./review/comment-utils": "./review/comment-utils.ts"
   },
+  "scripts": {
+    "test": "vitest run"
+  },
   "dependencies": {
     "@repo/database": "workspace:*",
     "inngest": "^4.11.0"
   },
   "devDependencies": {
     "@repo/typescript-config": "workspace:*",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.4"
   }
 }

@@ -34,7 +34,7 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
             <strong>GitHub</strong> — full access: repos, pull requests, and AI reviews.
           </span>
           <span className="mt-2 block text-muted-foreground">
-            <strong>Email</strong> — planning only: features, PRDs, tasks, and approvals.
+            <strong>Email</strong> — planning only: features, requirements, tasks, and approvals.
             Connect GitHub later from the dashboard Get started guide.
           </span>
         </CardDescription>

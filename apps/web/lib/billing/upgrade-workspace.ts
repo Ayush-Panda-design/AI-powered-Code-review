@@ -1,32 +1,43 @@
-import { PRO_PLAN_LIMITS } from "@/lib/razorpay";
+import { PRO_PERIOD_MS, PRO_PLAN_LIMITS } from "@/lib/razorpay";
 import { prisma } from "@/lib/db";
-
-const PRO_PERIOD_MS = 30 * 24 * 60 * 60 * 1000;
 
 export type UpgradeWorkspaceResult =
   | { ok: true; upgraded: true }
   | { ok: true; upgraded: false; reason: "already_processed" };
 
-/** Idempotent Pro upgrade after Razorpay payment (verify route + webhook). */
+type UpgradeInput = {
+  razorpaySubscriptionId: string;
+  razorpayPaymentId?: string;
+  /** Extend from this date on renewal (defaults to now). */
+  periodStart?: Date;
+};
+
+/** Idempotent Pro upgrade after Razorpay subscription payment (verify route + webhook). */
 export async function upgradeWorkspaceToPro(
   workspaceId: string,
-  razorpayOrderId: string,
-  razorpayPaymentId?: string,
+  input: UpgradeInput,
 ): Promise<UpgradeWorkspaceResult> {
+  const { razorpaySubscriptionId, razorpayPaymentId, periodStart } = input;
+
   const existing = await prisma.subscription.findUnique({
     where: { workspaceId },
-    select: { plan: true, razorpaySubscriptionId: true, razorpayPaymentId: true },
+    select: {
+      plan: true,
+      razorpaySubscriptionId: true,
+      razorpayPaymentId: true,
+    },
   });
 
   if (
-    existing?.plan === "pro" &&
-    (existing.razorpayPaymentId === razorpayPaymentId ||
-      existing.razorpaySubscriptionId === razorpayOrderId)
+    razorpayPaymentId &&
+    existing?.razorpayPaymentId === razorpayPaymentId
   ) {
     return { ok: true, upgraded: false, reason: "already_processed" };
   }
 
-  const periodEnd = new Date(Date.now() + PRO_PERIOD_MS);
+  const periodEnd = new Date(
+    (periodStart ?? new Date()).getTime() + PRO_PERIOD_MS,
+  );
 
   await prisma.$transaction([
     prisma.workspace.update({
@@ -43,14 +54,14 @@ export async function upgradeWorkspaceToPro(
         workspaceId,
         plan: "pro",
         status: "active",
-        razorpaySubscriptionId: razorpayOrderId,
+        razorpaySubscriptionId,
         razorpayPaymentId: razorpayPaymentId ?? null,
         currentPeriodEnd: periodEnd,
       },
       update: {
         plan: "pro",
         status: "active",
-        razorpaySubscriptionId: razorpayOrderId,
+        razorpaySubscriptionId,
         razorpayPaymentId: razorpayPaymentId ?? null,
         currentPeriodEnd: periodEnd,
       },
@@ -58,4 +69,34 @@ export async function upgradeWorkspaceToPro(
   ]);
 
   return { ok: true, upgraded: true };
+}
+
+/** Extends Pro period and refreshes credits on recurring subscription.charged events. */
+export async function renewWorkspaceProSubscription(
+  workspaceId: string,
+  razorpaySubscriptionId: string,
+  razorpayPaymentId?: string,
+): Promise<UpgradeWorkspaceResult> {
+  const existing = await prisma.subscription.findUnique({
+    where: { workspaceId },
+    select: { currentPeriodEnd: true, razorpayPaymentId: true },
+  });
+
+  if (
+    razorpayPaymentId &&
+    existing?.razorpayPaymentId === razorpayPaymentId
+  ) {
+    return { ok: true, upgraded: false, reason: "already_processed" };
+  }
+
+  const periodStart =
+    existing?.currentPeriodEnd && existing.currentPeriodEnd > new Date()
+      ? existing.currentPeriodEnd
+      : new Date();
+
+  return upgradeWorkspaceToPro(workspaceId, {
+    razorpaySubscriptionId,
+    razorpayPaymentId,
+    periodStart,
+  });
 }

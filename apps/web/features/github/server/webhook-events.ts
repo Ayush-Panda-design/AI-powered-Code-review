@@ -12,6 +12,7 @@ import {
   type ReviewablePullRequestAction,
 } from "@/features/reviews/types/review";
 import { prisma } from "@/lib/db";
+import { syncInstallationRepositories } from "@repo/services";
 
 function isReviewableAction(
   action: string,
@@ -74,15 +75,19 @@ export async function handleInstallationEvent(payload: InstallationPayload) {
 export async function handleInstallationRepositoriesEvent(
   payload: InstallationRepositoriesPayload,
 ) {
+  const result = await syncInstallationRepositories({
+    installationId: payload.installation.id,
+    repositoriesAdded: payload.repositories_added,
+    repositoriesRemoved: payload.repositories_removed,
+  });
+
   if (process.env.NODE_ENV === "development") {
-    const added = payload.repositories_added?.length ?? 0;
-    const removed = payload.repositories_removed?.length ?? 0;
     console.info(
-      `[github/webhook] installation_repositories ${payload.action}: +${added} -${removed}`,
+      `[github/webhook] installation_repositories ${payload.action}: +${result.addedCount} -${result.removedCount}`,
     );
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, ...result });
 }
 
 export async function handlePullRequestEvent(payload: PullRequestWebhookPayload) {

@@ -42,7 +42,7 @@ const MILESTONE_DEFS: Array<{
 }> = [
   { key: "request", label: "Request", description: "Capture the idea" },
   { key: "clarify", label: "Clarify", description: "AI Q&A on scope" },
-  { key: "prd", label: "PRD", description: "Spec the work" },
+  { key: "prd", label: "Requirements", description: "Spec the work" },
   { key: "plan", label: "Plan", description: "Tasks & approval" },
   { key: "build", label: "Build", description: "Write code & open PR" },
   { key: "review", label: "Review", description: "AI checks the code" },
@@ -68,36 +68,36 @@ const STATUS_TO_INDEX: Record<string, number> = {
 const NEXT_ACTIONS: Record<string, NextAction> = {
   draft: {
     title: "Start the delivery loop",
-    hint: "Run AI Clarify to refine the idea, or jump straight to Generate PRD.",
+    hint: "Run AI Clarify to refine the idea, or jump straight to Write requirements.",
     inFlight: false,
     tone: "action",
   },
   clarifying: {
     title: "AI is asking questions",
-    hint: "Reply in the Clarifications box below, then Generate the PRD.",
+    hint: "Reply in the Clarifications box below, then write the requirements.",
     inFlight: true,
     tone: "running",
   },
   prd_generating: {
-    title: "Writing the PRD",
+    title: "Writing requirements",
     hint: "The AI is drafting your product requirements — this takes a few seconds.",
     inFlight: true,
     tone: "running",
   },
   awaiting_prd_approval: {
-    title: "Approve the PRD",
-    hint: "Review the generated spec below, then click Approve PRD to unlock tasks.",
+    title: "Approve the requirements",
+    hint: "Review the generated spec below, then click Approve requirements to unlock tasks.",
     inFlight: false,
     tone: "action",
   },
   prd_ready: {
     title: "Generate engineering tasks",
-    hint: "PRD approved. Click Generate tasks to break it into work items.",
+    hint: "Requirements approved. Click Generate tasks to break it into work items.",
     inFlight: false,
     tone: "action",
   },
   planning: {
-    title: "Breaking PRD into tasks",
+    title: "Breaking requirements into tasks",
     hint: "The AI is generating the engineering task list.",
     inFlight: true,
     tone: "running",
@@ -116,7 +116,7 @@ const NEXT_ACTIONS: Record<string, NextAction> = {
   },
   in_review: {
     title: "AI is reviewing the code",
-    hint: "ShipFlow is checking the linked PR against the PRD and tasks.",
+    hint: "ShipFlow is checking the linked pull request against the requirements and tasks.",
     inFlight: true,
     tone: "running",
   },

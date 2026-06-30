@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { DASHBOARD_BASE_PATH } from "@/features/dashboard/lib/routes";
+import { formatPlan } from "@/features/dashboard/lib/user-facing-labels";
 import { SectionGuideCard } from "@/features/dashboard/components/section-guide-card";
 import { getInstallationForUser } from "@/features/github/server/installation";
 import { ensureWorkspaceAction } from "@/lib/actions/shipflow";
@@ -57,10 +58,11 @@ export default async function SettingsPage() {
             <span className="text-muted-foreground">Name:</span> {workspace.name}
           </p>
           <p>
-            <span className="text-muted-foreground">Plan:</span> {workspace.plan}
+            <span className="text-muted-foreground">Plan:</span>{" "}
+            {formatPlan(workspace.plan)}
           </p>
           <p>
-            <span className="text-muted-foreground">AI credits:</span>{" "}
+            <span className="text-muted-foreground">AI credits left:</span>{" "}
             {workspace.aiCredits}
           </p>
           <Link href={`${DASHBOARD_BASE_PATH}/workspaces`} className="text-sm underline">
@@ -76,11 +78,13 @@ export default async function SettingsPage() {
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           <p>
-            <span className="text-muted-foreground">App configured:</span>{" "}
-            {isGitHubAppConfigured() ? "Yes" : "No"}
+            <span className="text-muted-foreground">Status:</span>{" "}
+            {isGitHubAppConfigured()
+              ? "Ready to connect repositories"
+              : "Not available on this site"}
           </p>
           <p>
-            <span className="text-muted-foreground">Installation:</span>{" "}
+            <span className="text-muted-foreground">Your GitHub:</span>{" "}
             {installation
               ? `Connected (@${installation.accountLogin})`
               : "Not connected"}

@@ -277,7 +277,7 @@ export function TaskBoard({ projectId, fromFeatureId }: TaskBoardProps) {
     return (
       <LoadingState
         label="Loading task board"
-        description="Organizing engineering tasks from your approved PRDs."
+        description="Organizing engineering tasks from your approved requirements."
         variant="tasks"
       />
     );
@@ -385,7 +385,7 @@ export function TaskBoard({ projectId, fromFeatureId }: TaskBoardProps) {
             <p className="text-sm font-medium text-violet-700 dark:text-violet-300">AI is generating tasks for this feature…</p>
           </div>
           <p className="mt-1.5 text-xs text-muted-foreground">
-            Engineering tasks are being created from the approved PRD. This page refreshes automatically.
+            Engineering tasks are being created from the approved requirements. This page refreshes automatically.
           </p>
           <div className="mt-4 h-1 overflow-hidden rounded-full bg-violet-500/15">
             <div className="h-full w-[55%] animate-pulse rounded-full bg-violet-500" />
@@ -669,7 +669,7 @@ function TaskCard({ task, actions }: TaskCardProps) {
           <>
             <div className="space-y-1.5 border-t border-border/30 pt-2.5">
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
-                AI codegen <span className="font-normal normal-case text-muted-foreground/75">(optional)</span>
+                AI draft code <span className="font-normal normal-case text-muted-foreground/75">(optional)</span>
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {canGenerate && (
@@ -931,8 +931,8 @@ function GuidePanel({ open, onToggle }: { open: boolean; onToggle: () => void })
       </CardHeader>
       <CardContent className="space-y-4 text-xs text-muted-foreground">
         <p className="leading-relaxed">
-          Tasks come from approved PRDs and are grouped by <strong className="text-foreground">feature</strong>.
-          You can build entirely in your IDE — <strong className="text-foreground">AI codegen</strong> and{" "}
+          Tasks come from approved requirements and are grouped by <strong className="text-foreground">feature</strong>.
+          You can build entirely in your IDE — <strong className="text-foreground">AI draft code</strong> and{" "}
           <strong className="text-foreground">draft PRs</strong> are optional shortcuts, not required.
         </p>
 
@@ -959,7 +959,7 @@ function GuidePanel({ open, onToggle }: { open: boolean; onToggle: () => void })
           <div className="grid gap-2 sm:grid-cols-2">
             <GuideItem icon={<ChevronDown className="size-3.5" />} title="Collapsible cards" body="Click a task header to expand or collapse. Status pill and summary stay visible when collapsed." />
             <GuideItem icon={<Sparkles className="size-3.5 text-primary" />} title="Feature groups" body="Tasks are nested under their feature title — click it to open the feature request page." />
-            <GuideItem icon={<ListTodo className="size-3.5 text-indigo-500" />} title="Feature status" body="Badge shows where the parent feature sits in the ShipFlow journey (clarify, PRD, dev, etc.)." />
+            <GuideItem icon={<ListTodo className="size-3.5 text-indigo-500" />} title="Feature status" body="Badge shows where the parent feature sits in the ShipFlow journey (clarify, requirements, dev, etc.)." />
           </div>
         </GuideSection>
 

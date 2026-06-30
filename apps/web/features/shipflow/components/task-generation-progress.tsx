@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
 
 const PHASES = [
-  { afterSec: 0, label: "Reading your PRD…" },
+  { afterSec: 0, label: "Reading your requirements…" },
   { afterSec: 3, label: "AI is drafting tasks…" },
   { afterSec: 15, label: "Finishing up — saving tasks…" },
   { afterSec: 35, label: "Still working — large specs can take up to a minute…" },

@@ -103,7 +103,7 @@ const journeySteps: JourneyStep[] = [
   {
     step: 3,
     title: "Create the plan document",
-    what: "AI turns the clarified idea into a written plan (PRD) — goals, scope, and what success looks like.",
+    what: "AI turns the clarified idea into a written requirements doc — goals, scope, and what success looks like.",
     why: "A shared plan keeps designers, builders, and reviewers aligned on the same goal.",
     how: "When clarifying is done, generate the plan. Read it, edit if needed, then approve it.",
     icon: FileText,
@@ -214,7 +214,7 @@ const pageGuides: PageGuide[] = [
     accent: "border-orange-500/30 bg-orange-500/5",
   },
   {
-    title: "PRD Editor",
+    title: "Requirements",
     href: `${DASHBOARD_BASE_PATH}/prd`,
     icon: FileText,
     summary: "View and edit the written plans AI created for your features.",
@@ -266,7 +266,7 @@ const pageGuides: PageGuide[] = [
     accent: "border-fuchsia-500/30 bg-fuchsia-500/5",
   },
   {
-    title: "Review SLA",
+    title: "Review speed",
     href: `${DASHBOARD_BASE_PATH}/review-sla`,
     icon: BarChart3,
     summary: "Charts showing how fast reviews happen per repository.",

@@ -43,7 +43,7 @@ export function UpgradeButton({
       const data = (await response.json()) as {
         error?: string;
         keyId?: string;
-        orderId?: string;
+        subscriptionId?: string;
         amount?: number;
         currency?: string;
         prefill?: { name?: string; email?: string };
@@ -53,21 +53,19 @@ export function UpgradeButton({
         throw new Error(data.error ?? "Checkout failed");
       }
 
-      if (!window.Razorpay || !data.keyId || !data.orderId) {
+      if (!window.Razorpay || !data.keyId || !data.subscriptionId) {
         throw new Error("Razorpay checkout is not available");
       }
 
       const rzp = new window.Razorpay({
         key: data.keyId,
-        amount: data.amount,
-        currency: data.currency,
-        order_id: data.orderId,
+        subscription_id: data.subscriptionId,
         name: "ShipFlow AI",
-        description: "Pro plan — 30 days",
+        description: "Pro monthly subscription",
         prefill: data.prefill,
         theme: { color: "#7c3aed" },
         handler: async (response: {
-          razorpay_order_id: string;
+          razorpay_subscription_id: string;
           razorpay_payment_id: string;
           razorpay_signature: string;
         }) => {
@@ -76,7 +74,9 @@ export function UpgradeButton({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               workspaceId,
-              ...response,
+              razorpay_subscription_id: response.razorpay_subscription_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
             }),
           });
 
@@ -92,8 +92,8 @@ export function UpgradeButton({
 
           toast.success(
             verifyData.alreadyProcessed
-              ? "Pro plan is already active for this workspace."
-              : "Upgraded to Pro — credits and limits updated.",
+              ? "Pro subscription is already active for this workspace."
+              : "Subscribed to Pro — credits and limits updated.",
           );
           router.refresh();
         },
@@ -123,7 +123,7 @@ export function UpgradeButton({
           {loading ? (
             <ButtonLoadingLabel>Opening checkout…</ButtonLoadingLabel>
           ) : (
-            "Upgrade with Razorpay"
+            "Upgrade to Pro"
           )}
         </Button>
         {error && <p className="text-xs text-destructive">{error}</p>}

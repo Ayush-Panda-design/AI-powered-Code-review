@@ -40,7 +40,7 @@ export async function POST(request: Request) {
 
   if (feature.status !== "prd_ready" && feature.status !== "planning") {
     return NextResponse.json(
-      { ok: false, error: "Your feature isn't ready for task generation yet. Make sure the PRD is approved first." },
+      { ok: false, error: "Your feature isn't ready for task generation yet. Make sure the requirements are approved first." },
       { status: 400 },
     );
   }

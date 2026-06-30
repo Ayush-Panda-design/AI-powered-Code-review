@@ -1,19 +1,15 @@
 import { AI_CREDIT_COSTS } from "@repo/services/constants";
 
-import { BILLING_PATH } from "@/features/dashboard/lib/routes";
-
 type CreditHintOptions = {
   cost: number;
   credits: number;
   inFlight: boolean;
-  billingHref?: string;
 };
 
 export function getCreditAffordance({
   cost,
   credits,
   inFlight,
-  billingHref = BILLING_PATH,
 }: CreditHintOptions) {
   if (inFlight) {
     return {
@@ -25,7 +21,7 @@ export function getCreditAffordance({
   if (credits < cost) {
     return {
       canAfford: false,
-      hint: `Need ${cost} AI credits (you have ${credits}). Go to Billing (${billingHref}) to upgrade.`,
+      hint: `You need ${cost} AI credit${cost === 1 ? "" : "s"} (you have ${credits}). Upgrade on the Billing page.`,
     };
   }
 
@@ -62,7 +58,7 @@ export function getLowCreditsBannerMessage(
       message:
         credits === 0
           ? "You have no AI credits left. AI actions are disabled until you upgrade."
-          : `You need at least ${CLARIFY_PRD_TASKS_MIN_CREDIT_COST} AI credits for clarify, PRD, or tasks (you have ${credits}).`,
+          : `You need at least ${CLARIFY_PRD_TASKS_MIN_CREDIT_COST} AI credits for clarify, requirements, or tasks (you have ${credits}).`,
     };
   }
 

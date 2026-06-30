@@ -18,10 +18,10 @@ export default function ReviewSlaPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-lg font-semibold">Review SLA dashboard</h2>
+        <h2 className="text-lg font-semibold">Review speed</h2>
         <p className="text-sm text-muted-foreground">
-          Time-to-first-review by repository — spot bottlenecks before they stall
-          shipping.
+          How long pull requests wait before their first AI review — spot bottlenecks
+          before they slow shipping.
         </p>
       </div>
 

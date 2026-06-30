@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WorkspaceSwitcher } from "@/features/dashboard/components/workspace-switcher";
 import { WorkspaceMembersPanel } from "@/features/dashboard/components/workspace-members-panel";
+import { formatPlan } from "@/features/dashboard/lib/user-facing-labels";
 import { SectionGuideCard } from "@/features/dashboard/components/section-guide-card";
 import { ensureWorkspaceAction, setActiveWorkspaceAction } from "@/lib/actions/shipflow";
 import { requireSession } from "@/lib/auth-session";
@@ -31,7 +32,7 @@ export default async function WorkspacesPage() {
       <div>
         <h1 className="text-2xl font-semibold">Workspaces</h1>
         <p className="text-sm text-muted-foreground">
-          Multi-tenant workspaces with separate billing and delivery pipelines
+          Separate teams, billing, and delivery pipelines in one account
         </p>
       </div>
 
@@ -66,7 +67,7 @@ export default async function WorkspacesPage() {
             >
               <span>{workspace.name}</span>
               <span className="text-xs text-muted-foreground">
-                {workspace.plan} · {workspace.aiCredits} credits
+                {formatPlan(workspace.plan)} · {workspace.aiCredits} credits left
               </span>
             </div>
           ))}

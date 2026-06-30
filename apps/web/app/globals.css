@@ -464,3 +464,18 @@
     box-shadow: 0 12px 40px -12px color-mix(in oklch, var(--foreground) 12%, transparent);
   }
 }
+
+/* Landing page — warm palette (amber / emerald / stone), no purple/cyan */
+.landing-page {
+  --landing-bg: #fffaf3;
+  --landing-fg: #1c1410;
+  --landing-card: #ffffff;
+  --landing-muted: #fef3e2;
+}
+
+.dark .landing-page {
+  --landing-bg: #120e0a;
+  --landing-fg: #f5ebe0;
+  --landing-card: #1a1410;
+  --landing-muted: #1f1812;
+}
