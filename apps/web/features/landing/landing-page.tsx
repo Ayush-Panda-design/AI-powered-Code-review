@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/accordion";
 import { DEFAULT_POST_AUTH_PATH } from "@/lib/auth-proxy";
 import { cn } from "@/lib/utils";
-import { AsciiCloud } from "@/features/landing/components/ascii-cloud";
+import { ShipflowMissionControl } from "@/features/landing/components/shipflow-mission-control";
 import { FadeUp, Marquee, StaggerChildren, StaggerItem } from "@/features/landing/components/motion";
 import {
   Bracket,
@@ -295,15 +295,12 @@ export function LandingPage({ isSignedIn, userName }: LandingPageProps) {
                   </div>
                 </div>
 
-                {/* Right column — ASCII core */}
-                <div className="relative flex min-h-[280px] flex-col items-center justify-center p-6 sm:min-h-[360px] lg:min-h-0">
-                  <AsciiCloud className="h-full min-h-[240px] w-full max-w-2xl lg:min-h-[420px]" />
-                  <p className="absolute bottom-6 left-6 text-[10px] uppercase tracking-[0.3em] text-white/35">
-                    Processing delivery loop
-                  </p>
-                  <p className="absolute bottom-6 right-6 text-[10px] text-white/35">
-                    step {String(activeStep + 1).padStart(2, "0")} / {WORKFLOW.length}
-                  </p>
+                {/* Right column — live delivery mission control */}
+                <div className="relative flex min-h-[320px] flex-col lg:min-h-0">
+                  <ShipflowMissionControl
+                    activeStep={activeStep}
+                    className="min-h-[300px] flex-1 lg:min-h-[420px]"
+                  />
                 </div>
               </div>
             </TerminalFrame>

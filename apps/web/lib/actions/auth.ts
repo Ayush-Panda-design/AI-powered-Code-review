@@ -4,14 +4,22 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { auth } from "@/lib/auth";
-import { resolveCallbackUrl, SIGN_IN_PATH } from "@/lib/auth-proxy";
+import {
+  resolveAbsoluteCallbackUrl,
+  resolveCallbackUrl,
+  SIGN_IN_PATH,
+} from "@/lib/auth-proxy";
 
 export async function signInWithEmail(
   email: string,
   password: string,
   callbackUrl?: string
 ) {
-  const safeCallbackUrl = resolveCallbackUrl(callbackUrl);
+  const requestHeaders = await headers();
+  const safeCallbackUrl = resolveAbsoluteCallbackUrl(
+    callbackUrl,
+    requestHeaders,
+  );
 
   await auth.api.signInEmail({
     body: {
@@ -21,7 +29,7 @@ export async function signInWithEmail(
     },
   });
 
-  redirect(safeCallbackUrl);
+  redirect(resolveCallbackUrl(callbackUrl));
 }
 
 export async function signUpWithEmail(
@@ -30,7 +38,11 @@ export async function signUpWithEmail(
   password: string,
   callbackUrl?: string
 ) {
-  const safeCallbackUrl = resolveCallbackUrl(callbackUrl);
+  const requestHeaders = await headers();
+  const safeCallbackUrl = resolveAbsoluteCallbackUrl(
+    callbackUrl,
+    requestHeaders,
+  );
 
   await auth.api.signUpEmail({
     body: {
@@ -41,18 +53,22 @@ export async function signUpWithEmail(
     },
   });
 
-  redirect(safeCallbackUrl);
+  redirect(resolveCallbackUrl(callbackUrl));
 }
 
 export async function signInWithGithubAction(callbackUrl?: string) {
-  const safeCallbackUrl = resolveCallbackUrl(callbackUrl);
+  const requestHeaders = await headers();
+  const safeCallbackUrl = resolveAbsoluteCallbackUrl(
+    callbackUrl,
+    requestHeaders,
+  );
 
   const result = await auth.api.signInSocial({
     body: {
       provider: "github",
       callbackURL: safeCallbackUrl,
     },
-    headers: await headers(),
+    headers: requestHeaders,
   });
 
   if (result.url) {
