@@ -64,6 +64,22 @@ export const shipflowRouter = router({
         input.featureRequestId,
         AI_CREDIT_COSTS.clarify,
       );
+
+      if (ctx.jobs?.runClarify) {
+        try {
+          await ctx.jobs.runClarify(input.featureRequestId);
+          return { ok: true };
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Clarification failed. Please try again.",
+          });
+        }
+      }
+
       await sendClarifyJob(input.featureRequestId);
       return { ok: true };
     }),
@@ -76,6 +92,22 @@ export const shipflowRouter = router({
         input.featureRequestId,
         AI_CREDIT_COSTS.prd,
       );
+
+      if (ctx.jobs?.runPrd) {
+        try {
+          await ctx.jobs.runPrd(input.featureRequestId);
+          return { ok: true };
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Requirements generation failed. Please try again.",
+          });
+        }
+      }
+
       await sendPrdJob(input.featureRequestId);
       return { ok: true };
     }),

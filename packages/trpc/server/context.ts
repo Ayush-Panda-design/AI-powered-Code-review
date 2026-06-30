@@ -5,6 +5,8 @@ export type TrpcContext = {
   userId: string | null;
   /** Web app runs AI jobs inline; omit in tests to fall back to Inngest events. */
   jobs?: {
+    runClarify?: (featureRequestId: string) => Promise<void>;
+    runPrd?: (featureRequestId: string) => Promise<void>;
     runTasks?: (featureRequestId: string) => Promise<{ count: number }>;
   };
 };

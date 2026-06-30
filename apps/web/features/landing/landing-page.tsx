@@ -28,7 +28,6 @@ import {
 
 type LandingPageProps = {
   isSignedIn: boolean;
-  userName?: string | null;
 };
 
 const WORKFLOW = [
@@ -165,7 +164,7 @@ function TerminalLogo() {
   );
 }
 
-export function LandingPage({ isSignedIn, userName }: LandingPageProps) {
+export function LandingPage({ isSignedIn }: LandingPageProps) {
   const [scrolled, setScrolled] = useState(
     () => typeof window !== "undefined" && window.scrollY > HEADER_SCROLL_THRESHOLD_PX,
   );
@@ -187,11 +186,8 @@ export function LandingPage({ isSignedIn, userName }: LandingPageProps) {
   }, []);
 
   const primaryHref = isSignedIn ? dashboardHref : signInHref;
-  const primaryLabel = isSignedIn
-    ? userName
-      ? `Welcome, ${userName.split(" ")[0]}`
-      : "Open dashboard"
-    : "Get started";
+  const primaryLabel = isSignedIn ? "Go to dashboard" : "Get started";
+  const headerAuthLabel = isSignedIn ? "Go to dashboard" : "Sign in";
 
   return (
     <div className="landing-page landing-terminal min-h-screen bg-black font-[family-name:var(--font-mono-landing)] text-white">
@@ -217,7 +213,7 @@ export function LandingPage({ isSignedIn, userName }: LandingPageProps) {
             ))}
           </nav>
           <TerminalLink href={primaryHref} variant="ghost" className="px-4 py-2 text-[10px] sm:text-xs">
-            {isSignedIn ? "Dashboard" : "Sign in"}
+            {headerAuthLabel}
           </TerminalLink>
         </div>
       </header>
