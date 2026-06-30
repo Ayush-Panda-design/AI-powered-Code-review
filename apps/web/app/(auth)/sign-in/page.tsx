@@ -12,16 +12,20 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { redirectIfAuthenticated } from "@/lib/auth-session";
 import { resolveCallbackUrl } from "@/lib/auth-proxy";
+import { getOAuthErrorMessage } from "@/lib/auth-oauth-errors";
 
 type SignInPageProps = {
   searchParams: Promise<{
     callbackUrl?: string;
+    error?: string;
+    error_description?: string;
   }>;
 };
 
 export default async function SignInPage({ searchParams }: SignInPageProps) {
-  const { callbackUrl } = await searchParams;
+  const { callbackUrl, error, error_description } = await searchParams;
   const safeCallbackUrl = resolveCallbackUrl(callbackUrl);
+  const oauthError = getOAuthErrorMessage(error, error_description);
 
   await redirectIfAuthenticated(safeCallbackUrl);
 
@@ -40,6 +44,14 @@ export default async function SignInPage({ searchParams }: SignInPageProps) {
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-6">
+        {oauthError ? (
+          <div
+            className="rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive"
+            role="alert"
+          >
+            {oauthError}
+          </div>
+        ) : null}
         <GithubSignInForm />
         <div className="flex items-center gap-3">
           <Separator className="flex-1" />

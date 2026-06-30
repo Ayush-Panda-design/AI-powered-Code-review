@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
+import { getAuthBaseUrl } from "@/lib/auth-env";
+
 export const SIGN_IN_PATH = "/sign-in";
 export const DEFAULT_POST_AUTH_PATH = "/dashboard";
 
@@ -29,6 +31,31 @@ export function resolveCallbackUrl(
   }
 
   return callbackUrl;
+}
+
+export function resolveAbsoluteCallbackUrl(
+  callbackUrl: string | null | undefined,
+  requestHeaders: Headers,
+  fallback = DEFAULT_POST_AUTH_PATH,
+) {
+  const path = resolveCallbackUrl(callbackUrl, fallback);
+
+  const host =
+    requestHeaders.get("x-forwarded-host")?.split(",")[0]?.trim() ||
+    requestHeaders.get("host")?.trim();
+  const proto =
+    requestHeaders.get("x-forwarded-proto")?.split(",")[0]?.trim() || "https";
+
+  if (host) {
+    return `${proto}://${host}${path}`;
+  }
+
+  try {
+    const base = new URL(getAuthBaseUrl());
+    return `${base.origin}${path}`;
+  } catch {
+    return path;
+  }
 }
 
 export function hasSessionCookie(request: NextRequest) {

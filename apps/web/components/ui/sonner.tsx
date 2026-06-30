@@ -1,16 +1,16 @@
 "use client"
 
-import { useTheme } from "@teispace/next-themes"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 import { CircleCheckIcon, InfoIcon, TriangleAlertIcon, OctagonXIcon } from "lucide-react"
 import { LoadingIllustration } from "@/components/ui/loading-illustration"
+import { useRouteTheme } from "@/components/providers/route-theme-provider"
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+  const { theme } = useRouteTheme()
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme={theme}
       className="toaster group"
       icons={{
         success: (

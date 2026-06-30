@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Oxanium } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-import { ThemeProvider } from "@/components/providers/theme-provider";
+import { RouteThemeProvider as ThemeProvider } from "@/components/providers/route-theme-provider";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -40,13 +40,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <QueryProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="dark"
-            enableSystem
-            enableColorScheme={false}
-            disableTransitionOnChange
-          >
+          <ThemeProvider defaultTheme="dark">
         {children}
         <Toaster/>
         </ThemeProvider>

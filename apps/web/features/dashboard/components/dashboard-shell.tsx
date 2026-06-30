@@ -1,5 +1,6 @@
 "use client";
 
+import { ModeToggle } from "@/components/ui/mode-toggle";
 import { UserMenu } from "@/components/user/user-menu";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -53,6 +54,7 @@ export function DashboardShell({
               </p>
             ) : null}
           </div>
+          <ModeToggle />
           <UserMenu user={user} />
         </header>
         <AutoHideScroll className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto p-4 md:p-6">

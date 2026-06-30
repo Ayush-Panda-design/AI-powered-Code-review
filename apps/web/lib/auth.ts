@@ -43,5 +43,8 @@ export const auth = betterAuth({
       : {}),
   },
   trustedOrigins: getAuthTrustedOrigins(),
+  onAPIError: {
+    errorURL: "/sign-in",
+  },
   plugins: [nextCookies()],
 });
