@@ -46,12 +46,12 @@ export function buildReviewMarkdownFromAIReview(input: AIReviewMarkdownInput) {
     "## ShipFlow AI Review",
     "",
     prdAware
-      ? "_PRD-aware review against acceptance criteria and engineering tasks._"
-      : "_Generic code review (no linked PRD found)._",
+      ? "_Review against your requirements, acceptance criteria, and engineering tasks._"
+      : "_Generic code review (no linked requirements found)._",
     "",
     `**Summary:** ${input.summary}`,
     "",
-    `**PRD alignment:** ${input.prdAlignment ?? "Not evaluated."}`,
+    `**Requirements alignment:** ${input.prdAlignment ?? "Not evaluated."}`,
     "",
     ...(scoreLine ? [scoreLine, ""] : []),
     `**Findings:** ${input.blockingCount} blocking · ${input.nonBlockingCount} non-blocking`,

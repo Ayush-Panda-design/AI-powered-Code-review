@@ -464,3 +464,19 @@
     box-shadow: 0 12px 40px -12px color-mix(in oklch, var(--foreground) 12%, transparent);
   }
 }
+
+/* Landing page — terminal / GPU-manager aesthetic (pure black) */
+.landing-page {
+  --landing-bg: #000000;
+  --landing-fg: #ffffff;
+  --landing-card: #000000;
+  --landing-muted: #050505;
+}
+
+.landing-terminal {
+  color-scheme: dark;
+}
+
+.landing-terminal .landing-marquee-fade {
+  --landing-bg: #000000;
+}

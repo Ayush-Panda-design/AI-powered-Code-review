@@ -7,6 +7,7 @@
     "dev": "dotenv -e apps/web/.env -- turbo dev",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
+    "test": "turbo run test",
     "inngest:dev": "dotenv -e apps/web/.env -- pnpm --filter web inngest:dev",
     "db:generate": "dotenv -e apps/web/.env -- turbo db:generate",
     "db:migrate": "dotenv -e apps/web/.env -- turbo db:migrate",

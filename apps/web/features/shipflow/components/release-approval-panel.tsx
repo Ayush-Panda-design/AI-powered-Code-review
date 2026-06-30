@@ -190,7 +190,7 @@ export function ReleaseApprovalPanel({
           <CardTitle className="text-base">Release readiness check</CardTitle>
         </CardHeader>
         <CardContent className="text-sm text-muted-foreground">
-          AI is assessing PRD coverage, tasks, and review findings before human
+          AI is checking requirements coverage, tasks, and review findings before human
           approval. This page refreshes automatically.
         </CardContent>
       </Card>
@@ -211,7 +211,7 @@ export function ReleaseApprovalPanel({
           featureRequestId={featureRequestId}
           isPending={isPending}
           onSubmit={runAction}
-          description="Approve when the feature meets the PRD and passes AI review."
+          description="Approve when the feature meets the requirements and passes AI review."
           notesPlaceholder="Optional approval notes"
         />
 

@@ -16,6 +16,7 @@ import {
   Activity,
   BarChart3,
   CircleHelp,
+  PackageCheck,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 
@@ -52,7 +53,7 @@ export const dashboardNavGroups: DashboardNavGroup[] = [
   {
     id: "planning",
     label: "Plan & deliver",
-    hint: "Ideas → PRD → tasks",
+    hint: "Ideas → requirements → tasks",
     routes: [
       {
         title: "Workspaces",
@@ -69,7 +70,7 @@ export const dashboardNavGroups: DashboardNavGroup[] = [
         title: "Feature Requests",
         href: `${DASHBOARD_BASE_PATH}/feature-requests`,
         icon: Lightbulb,
-        description: "Request → PRD → Tasks → Ship",
+        description: "Request → requirements → tasks → ship",
       },
       {
         title: "Customer Intake",
@@ -78,10 +79,10 @@ export const dashboardNavGroups: DashboardNavGroup[] = [
         description: "Log customer requests from email, tickets, or calls",
       },
       {
-        title: "PRD Editor",
+        title: "Requirements",
         href: `${DASHBOARD_BASE_PATH}/prd`,
         icon: FileText,
-        description: "View and edit generated PRDs",
+        description: "View and edit product requirements",
       },
       {
         title: "Task Board",
@@ -107,10 +108,10 @@ export const dashboardNavGroups: DashboardNavGroup[] = [
         description: "AI review results across PRs",
       },
       {
-        title: "Review SLA",
+        title: "Review speed",
         href: `${DASHBOARD_BASE_PATH}/review-sla`,
         icon: BarChart3,
-        description: "Time-to-first-review by repo",
+        description: "How quickly pull requests get a first AI review",
       },
       {
         title: "Repositories",
@@ -134,6 +135,12 @@ export const dashboardNavGroups: DashboardNavGroup[] = [
         href: `${DASHBOARD_BASE_PATH}/approvals`,
         icon: ShieldCheck,
         description: "Human gate for features ready to ship",
+      },
+      {
+        title: "Shipped",
+        href: `${DASHBOARD_BASE_PATH}/shipped`,
+        icon: PackageCheck,
+        description: "Features approved and marked as shipped",
       },
       {
         title: "Activity",
@@ -184,9 +191,9 @@ export function getDashboardRoute(pathname: string) {
 export const FEATURE_STATUS_LABELS: Record<string, string> = {
   draft: "Draft",
   clarifying: "Clarifying",
-  prd_generating: "Generating PRD",
-  awaiting_prd_approval: "Awaiting PRD Approval",
-  prd_ready: "PRD Ready",
+  prd_generating: "Writing requirements",
+  awaiting_prd_approval: "Awaiting requirements approval",
+  prd_ready: "Requirements ready",
   planning: "Planning",
   awaiting_plan_approval: "Awaiting Plan Approval",
   in_development: "In Development",

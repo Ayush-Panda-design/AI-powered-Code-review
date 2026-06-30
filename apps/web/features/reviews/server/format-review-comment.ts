@@ -59,12 +59,12 @@ export function formatReviewComment(
     "## ShipFlow AI Review",
     "",
     options.prdAware
-      ? "_PRD-aware review against acceptance criteria and engineering tasks._"
-      : "_Generic code review (no linked PRD found)._",
+      ? "_Review against your requirements, acceptance criteria, and engineering tasks._"
+      : "_Generic code review (no linked requirements found)._",
     "",
     `**Summary:** ${review.summary}`,
     "",
-    `**PRD alignment:** ${review.prdAlignment}`,
+    `**Requirements alignment:** ${review.prdAlignment}`,
     "",
     ...(scoreLine ? [scoreLine, ""] : []),
     `**Findings:** ${options.blockingCount} blocking · ${options.nonBlockingCount} non-blocking`,

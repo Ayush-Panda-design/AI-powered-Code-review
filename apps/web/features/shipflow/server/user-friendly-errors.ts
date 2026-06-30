@@ -29,11 +29,11 @@ export function formatUserFriendlyError(error: unknown): string {
   }
 
   if (lower.includes("task model did not return") || lower.includes("did not return a json")) {
-    return "The AI couldn't build a task list from your PRD. Try again, or edit the PRD to be shorter.";
+    return "The AI couldn't build a task list from your requirements. Try again, or edit the requirements to be shorter.";
   }
 
   if (lower.includes("approve the prd")) {
-    return "Approve the PRD first, then generate tasks.";
+    return "Approve the requirements first, then generate tasks.";
   }
 
   if (lower.includes("credit") || lower.includes("insufficient")) {

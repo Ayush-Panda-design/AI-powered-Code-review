@@ -24,7 +24,7 @@ import { cn } from "@/lib/utils";
 const planningLinks = [
   { label: "Feature Requests", href: `${DASHBOARD_BASE_PATH}/feature-requests` },
   { label: "Customer Intake", href: `${DASHBOARD_BASE_PATH}/intake` },
-  { label: "PRD Editor", href: `${DASHBOARD_BASE_PATH}/prd` },
+  { label: "Requirements", href: `${DASHBOARD_BASE_PATH}/prd` },
   { label: "Task Board", href: `${DASHBOARD_BASE_PATH}/tasks` },
   { label: "Projects", href: `${DASHBOARD_BASE_PATH}/projects` },
 ] as const;

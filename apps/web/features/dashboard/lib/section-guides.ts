@@ -85,7 +85,7 @@ export const SECTION_GUIDES: Record<SectionGuideId, SectionGuideConfig> = {
           {
             icon: History,
             title: "Reviews this week",
-            body: "AI reviews run in the last 7 days, plus counts of PRDs and feature requests in your workspace.",
+            body: "AI reviews run in the last 7 days, plus counts of requirement docs and feature requests in your workspace.",
           },
           {
             icon: Rocket,
@@ -144,7 +144,7 @@ export const SECTION_GUIDES: Record<SectionGuideId, SectionGuideConfig> = {
           {
             icon: ShieldCheck,
             title: "Data stays separate",
-            body: "Features, PRDs, and reviews in Workspace A never mix with Workspace B.",
+            body: "Features, requirements, and reviews in Workspace A never mix with Workspace B.",
           },
           {
             icon: CreditCard,
@@ -233,7 +233,7 @@ export const SECTION_GUIDES: Record<SectionGuideId, SectionGuideConfig> = {
           },
           {
             icon: FileText,
-            title: "PRD & tasks",
+            title: "Requirements & tasks",
             body: "Generate a plan document, approve it, break into tasks, approve the plan, then develop.",
           },
           {
@@ -289,17 +289,17 @@ export const SECTION_GUIDES: Record<SectionGuideId, SectionGuideConfig> = {
     ],
   },
   prd: {
-    title: "How the PRD Editor works",
+    title: "How Requirements works",
     intro:
-      "PRDs (product requirement documents) are written plans AI creates from clarified feature requests. Read, edit, and approve them here before tasks are generated.",
+      "Written plans AI creates from clarified feature requests. Read, edit, and approve them here before tasks are generated.",
     blocks: [
       {
         title: "Using the list",
         items: [
           {
             icon: FileText,
-            title: "Open a PRD",
-            body: "Click any card to edit the full document — goals, user stories, acceptance criteria, edge cases.",
+            title: "Open a document",
+            body: "Click any card to edit the full plan — goals, user stories, acceptance criteria, edge cases.",
           },
           {
             icon: Lightbulb,
@@ -314,13 +314,13 @@ export const SECTION_GUIDES: Record<SectionGuideId, SectionGuideConfig> = {
           {
             icon: CheckCircle2,
             title: "Approve on feature page",
-            body: "After editing, approve the PRD on the feature detail page to unlock task generation.",
+            body: "After editing, approve the requirements on the feature detail page to unlock task generation.",
             iconClassName: "text-emerald-500",
           },
           {
             icon: MessagesSquare,
-            title: "No PRD yet?",
-            body: "Create a feature request, finish clarifying, then click Generate PRD on the feature page.",
+            title: "No requirements yet?",
+            body: "Create a feature request, finish clarifying, then click Write requirements on the feature page.",
           },
         ],
       },
@@ -419,9 +419,9 @@ export const SECTION_GUIDES: Record<SectionGuideId, SectionGuideConfig> = {
     ],
   },
   "review-sla": {
-    title: "How Review SLA works",
+    title: "How Review speed works",
     intro:
-      "Charts how fast your team gets a first AI review per repository — useful for spotting repos where PRs sit too long before review.",
+      "Charts how fast your team gets a first AI review per repository — useful for spotting repos where pull requests wait too long.",
     blocks: [
       {
         title: "The metrics",
@@ -612,7 +612,7 @@ export const SECTION_GUIDES: Record<SectionGuideId, SectionGuideConfig> = {
           {
             icon: Sparkles,
             title: "Pro",
-            body: "More repos, more credits, PRD-aware reviews, and task agents. Upgrade via Razorpay checkout.",
+            body: "More repos, more credits, smarter reviews, and task planning. Upgrade with one click.",
             iconClassName: "text-violet-500",
           },
         ],
@@ -623,7 +623,7 @@ export const SECTION_GUIDES: Record<SectionGuideId, SectionGuideConfig> = {
           {
             icon: Bot,
             title: "AI credits remaining",
-            body: "Each clarify, PRD, task generation, and PR review uses credits. Watch this number.",
+            body: "Each clarify, requirements doc, task generation, and PR review uses credits. Watch this number.",
           },
           {
             icon: FolderGit2,

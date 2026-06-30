@@ -10,7 +10,7 @@ export type ShipflowJobSuccess<T extends Record<string, unknown> = Record<string
 
 export const SHIPFLOW_JOB_ERRORS = {
   feature_not_found: "Feature request not found.",
-  prd_not_found: "PRD not found for this feature.",
+  prd_not_found: "Requirements not found for this feature.",
 } as const;
 
 export function shipflowJobFailure(

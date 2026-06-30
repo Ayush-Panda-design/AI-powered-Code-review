@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { mergeFeaturePullRequests } from "@/features/github/server/merge-feature-prs";
 import { queueReviewForPullRequest } from "@/features/reviews/server/trigger-review";
 import { requestManualReReview } from "@/features/shipflow/server/feature-workflow";
 import { requireSession } from "@/lib/auth-session";
@@ -15,6 +16,7 @@ import {
   connectRepositoryToProject,
   disconnectRepositoryFromProject,
   InsufficientCreditsError,
+  recordActivityEvent,
   recordPlanApproval,
   resolveWorkspaceIdForFeature,
   sendClarifyJob,
@@ -72,20 +74,41 @@ export async function triggerTaskGenerationAction(featureRequestId: string) {
 
 export { InsufficientCreditsError };
 
+async function assertWorkspaceFeatureAccess(
+  featureRequestId: string,
+  userId: string,
+  userName: string,
+) {
+  const workspace = await getActiveWorkspaceForUser(userId, userName);
+  const feature = await prisma.featureRequest.findFirst({
+    where: {
+      id: featureRequestId,
+      project: { workspaceId: workspace.id },
+    },
+    select: { id: true, status: true, title: true, projectId: true },
+  });
+
+  if (!feature) {
+    throw new Error("Feature not found");
+  }
+
+  return { workspace, feature };
+}
+
 export async function approveReleaseAction(
   featureRequestId: string,
   notes?: string
 ) {
   const session = await requireSession();
-
-  const feature = await prisma.featureRequest.findUnique({
-    where: { id: featureRequestId },
-    select: { status: true },
-  });
+  const { workspace, feature } = await assertWorkspaceFeatureAccess(
+    featureRequestId,
+    session.user.id,
+    session.user.name ?? "User",
+  );
 
   const approvableStatuses = new Set(["awaiting_approval", "fix_needed"]);
 
-  if (!feature || !approvableStatuses.has(feature.status)) {
+  if (!approvableStatuses.has(feature.status)) {
     throw new Error("Feature cannot be approved in its current state");
   }
 
@@ -104,7 +127,35 @@ export async function approveReleaseAction(
     }),
   ]);
 
+  let mergeResults: Awaited<ReturnType<typeof mergeFeaturePullRequests>> = [];
+  try {
+    mergeResults = await mergeFeaturePullRequests(featureRequestId, feature.title);
+  } catch {
+    // Shipping succeeds even if GitHub merge is unavailable.
+  }
+
+  const mergedCount = mergeResults.filter((result) => result.merged).length;
+  const mergeDetail =
+    mergeResults.length === 0
+      ? notes?.trim() || "Approved for release by human reviewer."
+      : mergeResults.every((result) => result.merged)
+        ? `Approved and merged ${mergedCount} linked PR(s).`
+        : `Approved. Merged ${mergedCount}/${mergeResults.length} linked PR(s).`;
+
+  await recordActivityEvent({
+    workspaceId: workspace.id,
+    actorId: session.user.id,
+    type: "feature_shipped",
+    title: `Feature shipped: ${feature.title}`,
+    detail: mergeDetail,
+    metadata: { featureRequestId, mergeResults },
+  });
+
   revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
+  revalidatePath("/dashboard/approvals");
+  revalidatePath("/dashboard/shipped");
+  revalidatePath("/dashboard/activity");
+  revalidatePath("/dashboard/pull-requests");
 }
 
 export async function rejectReleaseAction(
@@ -112,13 +163,13 @@ export async function rejectReleaseAction(
   notes?: string
 ) {
   const session = await requireSession();
+  const { workspace, feature } = await assertWorkspaceFeatureAccess(
+    featureRequestId,
+    session.user.id,
+    session.user.name ?? "User",
+  );
 
-  const feature = await prisma.featureRequest.findUnique({
-    where: { id: featureRequestId },
-    select: { status: true },
-  });
-
-  if (!feature || feature.status !== "awaiting_approval") {
+  if (feature.status !== "awaiting_approval") {
     throw new Error("Feature is not awaiting approval");
   }
 
@@ -142,8 +193,18 @@ export async function rejectReleaseAction(
     }),
   ]);
 
+  await recordActivityEvent({
+    workspaceId: workspace.id,
+    actorId: session.user.id,
+    type: "release_rejected",
+    title: `Release rejected: ${feature.title}`,
+    detail: trimmedNotes,
+    metadata: { featureRequestId },
+  });
+
   revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
   revalidatePath("/dashboard/approvals");
+  revalidatePath("/dashboard/activity");
 }
 
 export async function approvePrdAction(featureRequestId: string) {

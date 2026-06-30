@@ -1,7 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 
 import { prisma } from "@/lib/db";
+import { checkRateLimit, getClientIp } from "@/lib/rate-limit";
 import { createFeatureRequest, queueAutoClarification } from "@repo/services";
+
+const intakeBodySchema = z.object({
+  workspaceId: z.string().min(1),
+  title: z.string().trim().min(1).max(200),
+  description: z.string().trim().min(1).max(10_000),
+  source: z.enum(["email", "ticket", "call"]).default("email"),
+});
 
 async function getOrCreateDefaultProject(workspaceId: string) {
   const existing = await prisma.project.findFirst({
@@ -33,26 +42,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let body: {
-    workspaceId?: string;
-    title?: string;
-    description?: string;
-    source?: "email" | "ticket" | "call";
-  };
+  const rateLimit = checkRateLimit(
+    `intake:${getClientIp(request)}`,
+    30,
+    60_000,
+  );
+  if (!rateLimit.ok) {
+    return NextResponse.json(
+      { error: "Too many requests" },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(rateLimit.retryAfterSeconds),
+        },
+      },
+    );
+  }
 
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const { workspaceId, title, description, source = "email" } = body;
-  if (!workspaceId || !title?.trim() || !description?.trim()) {
+  const parsed = intakeBodySchema.safeParse(body);
+  if (!parsed.success) {
     return NextResponse.json(
-      { error: "workspaceId, title, and description are required" },
+      { error: "Invalid request body", details: parsed.error.flatten() },
       { status: 400 },
     );
   }
+
+  const { workspaceId, title, description, source } = parsed.data;
 
   const workspace = await prisma.workspace.findUnique({
     where: { id: workspaceId },
@@ -66,8 +88,8 @@ export async function POST(request: NextRequest) {
   const project = await getOrCreateDefaultProject(workspaceId);
   const feature = await createFeatureRequest({
     projectId: project.id,
-    title: title.trim(),
-    description: description.trim(),
+    title,
+    description,
     source,
   });
 

@@ -33,14 +33,14 @@ export default async function PrdDetailPage({ params }: PrdDetailPageProps) {
           href="/dashboard/prd"
           className="text-sm text-muted-foreground hover:underline"
         >
-          ← PRD Editor
+          ← Requirements
         </Link>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <h1 className="text-2xl font-semibold">{feature.title}</h1>
           <FeatureStatusBadge status={feature.status} />
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          Edit the PRD markdown. Changes sync to the feature detail page.
+          Edit the requirements document. Changes sync to the feature page.
         </p>
       </div>
 

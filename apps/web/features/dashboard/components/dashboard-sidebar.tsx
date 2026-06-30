@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Sparkles } from "lucide-react";
+
+import { ShipFlowMark } from "@/components/brand/shipflow-logo";
 
 import {
   Sidebar,
@@ -88,8 +89,8 @@ export function DashboardSidebar({
               render={<Link href="/" />}
               className="data-[active=true]:bg-transparent"
             >
-              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm ring-1 ring-primary/20">
-                <Sparkles className="size-4" />
+              <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-amber-500/15 shadow-sm ring-1 ring-amber-600/20">
+                <ShipFlowMark className="size-6" />
               </div>
               <div className="grid flex-1 text-left text-sm leading-tight">
                 <span className="truncate font-semibold">ShipFlow AI</span>

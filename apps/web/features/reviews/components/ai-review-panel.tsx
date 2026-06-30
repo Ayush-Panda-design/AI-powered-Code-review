@@ -135,7 +135,7 @@ export function AiReviewPanel({ reviews }: { reviews: AiReviewRecord[] }) {
         {selected.prdAlignment && (
           <div>
             <p className="mb-1 text-xs font-medium uppercase text-muted-foreground">
-              PRD alignment
+              Requirements alignment
             </p>
             <p className="whitespace-pre-wrap">{selected.prdAlignment}</p>
           </div>

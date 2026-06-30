@@ -53,7 +53,7 @@ export default async function TasksPage({
             Task board
           </h1>
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-            Engineering tasks from approved PRDs — move cards across columns as work progresses.
+            Engineering tasks from approved requirements — move cards across columns as work progresses.
           </p>
         </div>
         <ProjectPicker

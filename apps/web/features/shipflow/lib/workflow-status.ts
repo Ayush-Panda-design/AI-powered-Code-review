@@ -3,17 +3,17 @@ export function describeWorkflowStatus(status: string) {
     case "clarifying":
       return "AI is generating clarification questions for this request.";
     case "prd_generating":
-      return "AI is writing the PRD from your feature request.";
+      return "AI is writing requirements from your feature request.";
     case "awaiting_prd_approval":
-      return "PRD draft is ready. A team member must approve the PRD before task generation.";
+      return "Requirements draft is ready. A team member must approve them before task generation.";
     case "planning":
-      return "AI is breaking the PRD into engineering tasks.";
+      return "AI is breaking the requirements into engineering tasks.";
     case "fix_needed":
       return "AI flagged blocking issues. Fix and re-review, or approve manually if findings are false positives.";
     case "in_development":
       return "Fixes in progress. Push commits or run re-review when ready.";
     case "in_review":
-      return "AI review running against PRD and acceptance criteria.";
+      return "AI review running against requirements and acceptance criteria.";
     case "release_checking":
       return "AI is assessing release readiness before human approval.";
     case "awaiting_plan_approval":
@@ -48,26 +48,26 @@ export function getWorkflowProgress(status: string): WorkflowProgress | null {
     prd_generating: {
       step: 2,
       totalSteps: 4,
-      stepLabel: "Generate PRD",
+      stepLabel: "Write requirements",
       description: "Drafting product requirements…",
     },
     planning: {
       step: 3,
       totalSteps: 4,
       stepLabel: "Generate tasks",
-      description: "Breaking PRD into engineering tasks…",
+      description: "Breaking requirements into engineering tasks…",
     },
     in_review: {
       step: 4,
       totalSteps: 5,
       stepLabel: "AI review",
-      description: "Reviewing linked PR against PRD…",
+      description: "Reviewing linked pull request against requirements…",
     },
     release_checking: {
       step: 5,
       totalSteps: 5,
       stepLabel: "Release readiness",
-      description: "Checking PRD, tasks, and review findings…",
+      description: "Checking requirements, tasks, and review findings…",
     },
   };
 

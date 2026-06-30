@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 
+import { formatActivityType } from "@/features/dashboard/lib/user-facing-labels";
 import {
   DashboardListFilters,
   filterBySearch,
@@ -69,7 +70,7 @@ export function ActivityFeed({ workspaceId }: { workspaceId: string }) {
       <DashboardListFilters
         search={search}
         onSearchChange={setSearch}
-        searchPlaceholder="Search activity title, detail, type…"
+        searchPlaceholder="Search activity…"
         resultCount={filteredEvents.length}
         totalCount={events.length}
       >
@@ -78,10 +79,10 @@ export function ActivityFeed({ workspaceId }: { workspaceId: string }) {
           onChange={(event) => setTypeFilter(event.target.value)}
           className="h-9 rounded-md border bg-background px-3 text-sm"
         >
-          <option value="all">All types</option>
+          <option value="all">All activity</option>
           {typeOptions.map((type) => (
             <option key={type} value={type}>
-              {type}
+              {formatActivityType(type)}
             </option>
           ))}
         </select>

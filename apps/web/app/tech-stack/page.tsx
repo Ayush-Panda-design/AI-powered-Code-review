@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { ArrowLeft, Sparkles } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
+
+import { ShipFlowLogo } from "@/components/brand/shipflow-logo";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,9 +32,8 @@ export default function TechStackPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-zinc-50 via-white to-zinc-100 dark:from-zinc-950 dark:via-black dark:to-zinc-950">
       <header className="mx-auto flex max-w-4xl items-center justify-between px-6 py-6">
-        <Link href="/" className="flex items-center gap-2 font-semibold text-lg">
-          <Sparkles className="size-5 text-violet-500" />
-          ShipFlow AI
+        <Link href="/">
+          <ShipFlowLogo size="sm" />
         </Link>
         <div className="flex items-center gap-3">
           <ModeToggle />

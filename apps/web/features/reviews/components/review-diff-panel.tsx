@@ -62,7 +62,7 @@ export function ReviewDiffPanel({ reviews }: { reviews: ReviewSnapshot[] }) {
   return (
     <div className="space-y-3 rounded-lg border p-4">
       <p className="text-xs font-medium uppercase text-muted-foreground">
-        Review diff
+        Compare reviews
       </p>
       <div className="flex flex-wrap gap-2">
         <label className="flex items-center gap-1 text-xs">

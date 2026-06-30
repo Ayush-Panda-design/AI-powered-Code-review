@@ -28,10 +28,10 @@ export function PrdEditorForm({
         startTransition(async () => {
           try {
             await updatePrdAction(featureRequestId, markdown);
-            toast.success("PRD saved");
+            toast.success("Requirements saved");
           } catch (error) {
             toast.error(
-              error instanceof Error ? error.message : "Failed to save PRD",
+              error instanceof Error ? error.message : "Failed to save requirements",
             );
           }
         });
@@ -40,14 +40,14 @@ export function PrdEditorForm({
       <Textarea
         value={markdown}
         onChange={(event) => setMarkdown(event.target.value)}
-        className="min-h-[480px] font-mono text-sm"
-        placeholder="PRD markdown…"
+        className="min-h-[480px] text-sm"
+        placeholder="Write goals, user stories, acceptance criteria…"
       />
       <Button type="submit" disabled={isPending || !markdown.trim()}>
         {isPending ? (
           <ButtonLoadingLabel>Saving…</ButtonLoadingLabel>
         ) : (
-          "Save PRD"
+          "Save requirements"
         )}
       </Button>
     </form>

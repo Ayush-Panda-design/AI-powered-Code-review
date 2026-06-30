@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { createProCheckoutOrder, getRazorpayConfigError } from "@/lib/razorpay";
-import { recordRazorpayCheckoutOrder } from "@/lib/billing/razorpay-order";
+import { recordRazorpaySubscription } from "@/lib/billing/razorpay-order";
+import { createProSubscription, getRazorpayConfigError } from "@/lib/razorpay";
 import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
 
@@ -37,16 +37,19 @@ export async function POST(request: Request) {
       );
     }
 
-    const checkout = await createProCheckoutOrder(workspaceId);
+    const checkout = await createProSubscription(workspaceId);
 
-    await recordRazorpayCheckoutOrder({
-      razorpayOrderId: checkout.orderId,
+    await recordRazorpaySubscription({
+      razorpaySubscriptionId: checkout.subscriptionId,
       workspaceId,
       amountPaise: checkout.amount,
     });
 
     return NextResponse.json({
-      ...checkout,
+      keyId: checkout.keyId,
+      subscriptionId: checkout.subscriptionId,
+      amount: checkout.amount,
+      currency: checkout.currency,
       prefill: {
         name: session.user.name,
         email: session.user.email,

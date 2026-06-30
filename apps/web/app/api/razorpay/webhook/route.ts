@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
 
-import { upgradeWorkspaceToPro } from "@/lib/billing/upgrade-workspace";
 import {
-  markRazorpayOrderPaid,
-  resolveWorkspaceForRazorpayOrder,
+  markRazorpaySubscriptionPaid,
+  resolveWorkspaceForRazorpaySubscription,
 } from "@/lib/billing/razorpay-order";
+import {
+  renewWorkspaceProSubscription,
+  upgradeWorkspaceToPro,
+} from "@/lib/billing/upgrade-workspace";
 import {
   isRazorpayWebhookConfigured,
   verifyRazorpayWebhookSignature,
@@ -21,6 +24,13 @@ type RazorpayWebhookPayload = {
         notes?: Record<string, string>;
       };
     };
+    subscription?: {
+      entity?: {
+        id?: string;
+        status?: string;
+        notes?: Record<string, string>;
+      };
+    };
     order?: {
       entity?: {
         id?: string;
@@ -29,6 +39,20 @@ type RazorpayWebhookPayload = {
     };
   };
 };
+
+async function resolveWorkspaceId(
+  subscriptionId: string | undefined,
+  notes?: Record<string, string>,
+) {
+  if (subscriptionId) {
+    const fromRecord = await resolveWorkspaceForRazorpaySubscription(subscriptionId);
+    if (fromRecord) {
+      return fromRecord;
+    }
+  }
+
+  return notes?.workspaceId ?? null;
+}
 
 export async function POST(request: Request) {
   if (!isRazorpayWebhookConfigured()) {
@@ -52,34 +76,92 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  if (payload.event !== "payment.captured") {
-    return NextResponse.json({ ok: true, ignored: true });
-  }
-
+  const subscription = payload.payload?.subscription?.entity;
   const payment = payload.payload?.payment?.entity;
-  const orderId = payment?.order_id ?? payload.payload?.order?.entity?.id;
-  const workspaceId =
-    (orderId ? await resolveWorkspaceForRazorpayOrder(orderId) : null) ??
-    payment?.notes?.workspaceId ??
-    payload.payload?.order?.entity?.notes?.workspaceId;
+  const subscriptionId = subscription?.id;
+  const paymentId = payment?.id;
+  const notes = subscription?.notes ?? payment?.notes;
 
-  if (!workspaceId || !orderId || payment?.status !== "captured") {
-    return NextResponse.json({ error: "Missing workspace context" }, { status: 400 });
+  switch (payload.event) {
+    case "subscription.activated":
+    case "subscription.charged": {
+      const workspaceId = await resolveWorkspaceId(subscriptionId, notes);
+      if (!workspaceId || !subscriptionId) {
+        return NextResponse.json(
+          { error: "Missing workspace context" },
+          { status: 400 },
+        );
+      }
+
+      const result =
+        payload.event === "subscription.charged"
+          ? await renewWorkspaceProSubscription(
+              workspaceId,
+              subscriptionId,
+              paymentId,
+            )
+          : await upgradeWorkspaceToPro(workspaceId, {
+              razorpaySubscriptionId: subscriptionId,
+              razorpayPaymentId: paymentId,
+            });
+
+      if (result.upgraded) {
+        await markRazorpaySubscriptionPaid(subscriptionId);
+      }
+
+      return NextResponse.json({
+        ok: true,
+        event: payload.event,
+        upgraded: result.upgraded,
+        alreadyProcessed: !result.upgraded,
+      });
+    }
+
+    case "subscription.cancelled":
+    case "subscription.halted": {
+      const workspaceId = await resolveWorkspaceId(subscriptionId, notes);
+      if (!workspaceId) {
+        return NextResponse.json({ ok: true, ignored: true });
+      }
+
+      const { prisma } = await import("@/lib/db");
+      await prisma.subscription.updateMany({
+        where: { workspaceId },
+        data: { status: "cancelled" },
+      });
+
+      return NextResponse.json({ ok: true, cancelled: true });
+    }
+
+    case "payment.captured": {
+      // Legacy one-time order fallback
+      const orderId = payment?.order_id ?? payload.payload?.order?.entity?.id;
+      const workspaceId =
+        (orderId
+          ? await resolveWorkspaceForRazorpaySubscription(orderId)
+          : null) ?? notes?.workspaceId;
+
+      if (!workspaceId || !orderId || payment?.status !== "captured") {
+        return NextResponse.json({ ok: true, ignored: true });
+      }
+
+      const result = await upgradeWorkspaceToPro(workspaceId, {
+        razorpaySubscriptionId: orderId,
+        razorpayPaymentId: paymentId,
+      });
+
+      if (result.upgraded) {
+        await markRazorpaySubscriptionPaid(orderId);
+      }
+
+      return NextResponse.json({
+        ok: true,
+        upgraded: result.upgraded,
+        legacyOrder: true,
+      });
+    }
+
+    default:
+      return NextResponse.json({ ok: true, ignored: true });
   }
-
-  const result = await upgradeWorkspaceToPro(
-    workspaceId,
-    orderId,
-    payment.id,
-  );
-
-  if (result.upgraded) {
-    await markRazorpayOrderPaid(orderId);
-  }
-
-  return NextResponse.json({
-    ok: true,
-    upgraded: result.upgraded,
-    alreadyProcessed: !result.upgraded,
-  });
 }

@@ -17,6 +17,10 @@ import {
   getGitHubInstallUrl,
 } from "@/features/github/utils/github-app";
 import { disconnectGitHubApp, linkGitHubInstallation } from "@/lib/actions/github";
+import {
+  formatGitHubAccountType,
+  isDevelopmentEnvironment,
+} from "@/features/dashboard/lib/user-facing-labels";
 import { cn } from "@/lib/utils";
 
 type GitHubConnectCardProps = {
@@ -173,7 +177,7 @@ export function GitHubConnectCard({
               <p className="font-medium">
                 @{installation.accountLogin}
                 <span className="ml-2 text-sm font-normal text-muted-foreground">
-                  ({installation.accountType})
+                  ({formatGitHubAccountType(installation.accountType)})
                 </span>
               </p>
               <p className="text-xs text-muted-foreground">
@@ -235,10 +239,12 @@ export function GitHubConnectCard({
           </div>
         ) : (
           <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border/60 p-6 text-center">
-            <p className="text-sm font-medium">GitHub App not configured</p>
+            <p className="text-sm font-medium">GitHub connection unavailable</p>
             <p className="text-sm text-muted-foreground">
-              {configError ??
-                "Check your .env GitHub App values and restart the dev server."}
+              {isDevelopmentEnvironment()
+                ? (configError ??
+                  "Add GitHub App settings to your local environment file and restart the dev server.")
+                : "GitHub integration is not set up for this site yet. Try again later or contact support."}
             </p>
           </div>
         )}

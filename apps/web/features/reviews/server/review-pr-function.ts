@@ -19,7 +19,8 @@ import {
   trySavePrMetrics,
 } from "@/features/reviews/server/persist-review";
 import { getPullRequestFiles } from "@/features/reviews/server/pr-files";
-import { postPrComment } from "@/features/reviews/server/pr-comment";
+import { postPrCheckRun } from "@/features/reviews/server/pr-check";
+import { postPrReviewWithComments } from "@/features/reviews/server/pr-comment";
 import {
   applyCommentBudget,
   buildReviewChangeSummary,
@@ -82,7 +83,7 @@ export const reviewPullRequest = inngest.createFunction(
     },
   },
   async ({ event, step }) => {
-    const { installationId, repoFullName, prNumber, title } = event.data;
+    const { installationId, repoFullName, prNumber, title, headSha } = event.data;
 
     const pullRequest = await step.run("load-pull-request", async () => {
       return prisma.pullRequest.findUnique({
@@ -171,8 +172,8 @@ export const reviewPullRequest = inngest.createFunction(
           review: {
             summary: comment,
             prdAlignment: reviewContext.prd
-              ? "No code changes to evaluate against the PRD."
-              : "No PRD linked.",
+              ? "No code changes to evaluate against the requirements."
+              : "No requirements linked.",
             findings: [],
           },
           blockingCount: 0,
@@ -291,9 +292,30 @@ export const reviewPullRequest = inngest.createFunction(
 
     await step.run("post-pr-comment", async () => {
       try {
-        await postPrComment(installationId, repoFullName, prNumber, commentBody);
+        await postPrReviewWithComments(
+          installationId,
+          repoFullName,
+          prNumber,
+          headSha,
+          commentBody,
+          enrichedReview.review.findings,
+          enrichedReview.blockingCount,
+        );
       } catch (error) {
         console.error("[review] GitHub comment failed:", error);
+      }
+    });
+
+    await step.run("post-pr-check", async () => {
+      try {
+        await postPrCheckRun(installationId, repoFullName, headSha, {
+          summary: commentBody,
+          blockingCount: enrichedReview.blockingCount,
+          nonBlockingCount: enrichedReview.nonBlockingCount,
+          confidenceScore: enrichedReview.confidenceScore,
+        });
+      } catch (error) {
+        console.error("[review] GitHub check run failed:", error);
       }
     });
 
