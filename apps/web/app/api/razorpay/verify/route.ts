@@ -4,13 +4,16 @@ import {
   markRazorpaySubscriptionPaid,
 } from "@/lib/billing/razorpay-order";
 import { upgradeWorkspaceToPro } from "@/lib/billing/upgrade-workspace";
-import { requireSession } from "@/lib/auth-session";
+import { getServerSession } from "@/lib/auth-session";
 import { verifyRazorpaySubscriptionSignature } from "@/lib/razorpay";
 import { prisma } from "@/lib/db";
 
 export async function POST(request: Request) {
   try {
-    const session = await requireSession("/dashboard/billing");
+    const session = await getServerSession();
+    if (!session) {
+      return NextResponse.json({ error: "Sign in required" }, { status: 401 });
+    }
 
     const body = (await request.json()) as {
       workspaceId?: string;

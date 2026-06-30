@@ -106,7 +106,7 @@ export function UpgradeButton({
           ? checkoutError.message
           : "Upgrade failed";
       setError(message);
-      toast.error(message);
+      toast.error("Couldn't open checkout", { description: message });
     } finally {
       setLoading(false);
     }
