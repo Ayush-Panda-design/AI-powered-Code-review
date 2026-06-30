@@ -9,6 +9,7 @@ const PHASES = [
   { afterSec: 3, label: "AI is drafting tasks…" },
   { afterSec: 15, label: "Finishing up — saving tasks…" },
   { afterSec: 35, label: "Still working — large specs can take up to a minute…" },
+  { afterSec: 55, label: "Almost done — do not close this tab…" },
 ] as const;
 
 function phaseForElapsed(seconds: number) {

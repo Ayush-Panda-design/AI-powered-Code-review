@@ -193,6 +193,13 @@ export function GitHubConnectCard({
           </div>
         ) : canInstall && installUrl ? (
           <div className="space-y-4">
+            <p className="rounded-lg border border-sky-500/30 bg-sky-500/10 px-4 py-3 text-sm text-sky-900 dark:text-sky-100">
+              If GitHub says the app is <strong>private</strong> and blocks install, the
+              app owner must open GitHub App settings →{" "}
+              <strong>Where can this GitHub App be installed?</strong> → choose{" "}
+              <strong>Any account</strong>. Until then, only the owner&apos;s GitHub can
+              connect.
+            </p>
             <div className="grid gap-4 lg:grid-cols-2">
               <ConnectOption
                 highlighted

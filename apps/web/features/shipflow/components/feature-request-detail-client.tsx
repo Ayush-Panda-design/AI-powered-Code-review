@@ -141,12 +141,33 @@ export function FeatureRequestDetailClient({
     aiMutationHandlers("Write requirements", AI_CREDIT_COSTS.prd),
   );
 
-  const tasksMutation = trpc.shipflow.triggerTasks.useMutation(
-    aiMutationHandlers("Generate tasks", AI_CREDIT_COSTS.tasks),
-  );
+  const tasksMutation = trpc.shipflow.triggerTasks.useMutation({
+    onMutate: () => {
+      toast.loading(`Generating tasks… (${AI_CREDIT_COSTS.tasks} credits)`, {
+        id: aiJobToastId(featureId, "Generate tasks"),
+      });
+    },
+    onSuccess: async (result) => {
+      const count =
+        "count" in result && typeof result.count === "number"
+          ? result.count
+          : null;
+      toast.success(
+        count != null
+          ? `Created ${count} task${count === 1 ? "" : "s"} — review them on the task board`
+          : "Task generation started",
+        { id: aiJobToastId(featureId, "Generate tasks") },
+      );
+      await invalidate();
+    },
+    onError: (err: { message: string }) => {
+      toast.error(err.message, { id: aiJobToastId(featureId, "Generate tasks") });
+    },
+  });
 
-  const isGeneratingTasks =
-    feature?.status === "planning" || tasksMutation.isPending;
+  const isGeneratingTasks = tasksMutation.isPending;
+  const isStuckInPlanning =
+    feature?.status === "planning" && !tasksMutation.isPending;
 
   const approvePrdMutation = trpc.shipflow.approvePrd.useMutation({
     onSuccess: async () => {
@@ -270,8 +291,8 @@ export function FeatureRequestDetailClient({
           <Button
             variant="outline"
             size="sm"
-            disabled={isGeneratingTasks || (!canGenerateTasks && feature.status !== "planning")}
-            title={canGenerateTasks || feature.status === "planning" ? creditAffordance(AI_CREDIT_COSTS.tasks).hint : "Approve the requirements doc before generating tasks"}
+            disabled={isGeneratingTasks || (!canGenerateTasks && !isStuckInPlanning)}
+            title={canGenerateTasks || isStuckInPlanning ? creditAffordance(AI_CREDIT_COSTS.tasks).hint : "Approve the requirements doc before generating tasks"}
             onClick={() => {
               const { canAfford, hint } = creditAffordance(AI_CREDIT_COSTS.tasks);
               if (!canAfford) { toast.error(hint); return; }
@@ -280,7 +301,7 @@ export function FeatureRequestDetailClient({
           >
             {isGeneratingTasks
               ? <ButtonLoadingLabel>Generating…</ButtonLoadingLabel>
-              : feature.status === "planning"
+              : isStuckInPlanning
                 ? "Retry generate tasks"
                 : formatAiActionLabel("Generate tasks", AI_CREDIT_COSTS.tasks)}
           </Button>
@@ -514,7 +535,7 @@ export function FeatureRequestDetailClient({
       )}
 
       {/* ── Task generation in progress ──────────────────────────────── */}
-      {feature.status === "planning" && !isGeneratingTasks && (
+      {isStuckInPlanning && (
         <div className="rounded-xl border border-amber-500/30 bg-amber-500/[0.05] p-4 space-y-2">
           <div className="flex items-center gap-2">
             <span className="inline-block size-2 rounded-full bg-amber-500" />
