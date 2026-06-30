@@ -4,7 +4,7 @@
 
 AI-assisted product delivery platform for the ChaiCode hackathon — from feature request to shipped code.
 
-**Live demo:** https://ai-powered-code-review-web.vercel.app
+**Live demo:** https://ai-powered-code-review-web.vercel.app   and shipflowai.in
 
 ## What it does
 
