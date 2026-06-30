@@ -52,6 +52,8 @@ export const auth = betterAuth({
     accountLinking: {
       enabled: true,
       trustedProviders: ["github"],
+      // GitHub OAuth already proves identity; don't block linking to email sign-ups.
+      requireLocalEmailVerified: false,
     },
   },
   socialProviders: {
@@ -63,8 +65,8 @@ export const auth = betterAuth({
             scope: ["read:user", "user:email"],
             mapProfileToUser: (profile) => {
               const githubProfile = profile as GitHubProfile;
-              const email =
-                githubProfile.email?.trim() || githubPlaceholderEmail(githubProfile);
+              // One ShipFlow user per GitHub account — never key off a shared real email.
+              const email = githubPlaceholderEmail(githubProfile);
 
               return {
                 email,
@@ -73,7 +75,7 @@ export const auth = betterAuth({
                   githubProfile.login?.trim() ||
                   "GitHub User",
                 image: githubProfile.image ?? undefined,
-                emailVerified: Boolean(githubProfile.email?.trim()),
+                emailVerified: true,
               };
             },
           },
