@@ -13,7 +13,7 @@ export const syncGitHubPullRequests = inngest.createFunction(
     triggers: [{ event: "github/sync.requested" }],
   },
   async ({ event, step }) => {
-    const { syncRunId, installationId, workspaceId } =
+    const { syncRunId, installationId: activeInstallationId, workspaceId } =
       event.data as GitHubSyncRequestedEvent;
 
     try {
@@ -26,7 +26,7 @@ export const syncGitHubPullRequests = inngest.createFunction(
         for (const repo of connected) {
           repoByName.set(repo.repoFullName, {
             full_name: repo.repoFullName,
-            installationId,
+            installationId: activeInstallationId,
           });
         }
         const repos = [...repoByName.values()];
@@ -50,18 +50,24 @@ export const syncGitHubPullRequests = inngest.createFunction(
         return syncConnectedRepositories(repositories, syncRunId);
       });
 
+      const failureMessage = buildSyncFailureMessage({
+        failedRepos: result.failedRepos,
+        totalRepos: result.totalRepos,
+        repoFailures: result.repoFailures,
+      });
+
       if (
         result.failedRepos === result.totalRepos &&
         result.totalRepos > 0
       ) {
         throw new Error(
-          buildSyncFailureMessage({
-            failedRepos: result.failedRepos,
-            totalRepos: result.totalRepos,
-            repoFailures: result.repoFailures,
-          }) ??
+          failureMessage ??
             "GitHub sync failed for every connected repository. Reconnect the GitHub App, then disconnect and reconnect each repo on the Repositories page.",
         );
+      }
+
+      if (failureMessage) {
+        console.warn("[github/sync/inngest] partial repo failures:", failureMessage);
       }
 
       // Step 3 — mark complete
