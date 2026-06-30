@@ -43,3 +43,6 @@ async function handler(req: Request) {
 }
 
 export { handler as GET, handler as POST, handler as OPTIONS };
+
+/** Task generation runs AI inline and can exceed the default 10s on cold DB. */
+export const maxDuration = 60;

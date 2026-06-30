@@ -109,6 +109,21 @@ export const shipflowRouter = router({
         AI_CREDIT_COSTS.tasks,
       );
 
+      if (ctx.jobs?.runTasks) {
+        try {
+          const result = await ctx.jobs.runTasks(input.featureRequestId);
+          return { ok: true, count: result.count };
+        } catch (error) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message:
+              error instanceof Error
+                ? error.message
+                : "Task generation failed. Please try again.",
+          });
+        }
+      }
+
       if (feature.status === "planning") {
         await updateFeatureStatus(input.featureRequestId, "prd_ready");
       }

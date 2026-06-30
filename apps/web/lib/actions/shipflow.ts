@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { mergeFeaturePullRequests } from "@/features/github/server/merge-feature-prs";
 import { queueReviewForPullRequest } from "@/features/reviews/server/trigger-review";
 import { requestManualReReview } from "@/features/shipflow/server/feature-workflow";
+import { runTasksJob } from "@/features/shipflow/server/run-shipflow-jobs";
+import { formatUserFriendlyError } from "@/features/shipflow/server/user-friendly-errors";
 import { requireSession } from "@/lib/auth-session";
 import { prisma } from "@/lib/db";
 import { getActiveWorkspaceForUser, WORKSPACE_COOKIE } from "@/lib/active-workspace";
@@ -21,7 +23,6 @@ import {
   resolveWorkspaceIdForFeature,
   sendClarifyJob,
   sendPrdJob,
-  sendTasksJob,
   updateFeatureStatus,
 } from "@repo/services";
 
@@ -67,7 +68,11 @@ export async function triggerPrdGenerationAction(featureRequestId: string) {
 export async function triggerTaskGenerationAction(featureRequestId: string) {
   await requireSession();
   await assertFeatureCredits(featureRequestId, AI_CREDIT_COSTS.tasks);
-  await sendTasksJob(featureRequestId);
+  try {
+    await runTasksJob(featureRequestId);
+  } catch (error) {
+    throw new Error(formatUserFriendlyError(error));
+  }
   revalidatePath(`/dashboard/feature-requests/${featureRequestId}`);
   revalidatePath("/dashboard/tasks");
 }

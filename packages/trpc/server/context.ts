@@ -3,6 +3,10 @@ import { prisma } from "@repo/database";
 
 export type TrpcContext = {
   userId: string | null;
+  /** Web app runs AI jobs inline; omit in tests to fall back to Inngest events. */
+  jobs?: {
+    runTasks?: (featureRequestId: string) => Promise<{ count: number }>;
+  };
 };
 
 function parseSessionToken(cookieHeader: string | undefined) {
